@@ -12,7 +12,6 @@ var BID
 var attacker
 var who
 var move
-var tempref
 var accuracy
 var user
 var movetype
@@ -39,6 +38,8 @@ var arrayx
 var env
 var movenum
 var counter
+
+var tempref
 var temp
 var temp2
 var temp3
@@ -60,331 +61,358 @@ var max
 var hittimes
 var debug
  
+ ( Takes params "target" and "attacker" )
+ ( Make attacker read from battle context? Same as "target"? )
 : powerlevelset
  
-var! target
-var! attacker
-var PL
-attacker @ PowerLevel PL !
-loc @ { "@battle/" BID @ "/battlepoints/" target @ "/PL" }cat getprop if
-loc @ { "@battle/" BID @ "/battlepoints/" target @ "/PL" }cat getprop PL @ >= if exit then
-then
-loc @ { "@battle/" BID @ "/battlepoints/" target @ "/PL" }cat PL @ setprop
-loc @ { "@battle/" BID @ "/battlepoints/" target @ "/attacker" }cat attacker @ setprop
+    var! target
+    var! attacker (NOT THE GLOBAL VAR)
+    var PL (power level)
+    attacker @ PowerLevel PL !
+    loc @ { "@battle/" BID @ "/battlepoints/" target @ "/PL" }cat getprop if
+    loc @ { "@battle/" BID @ "/battlepoints/" target @ "/PL" }cat getprop PL @ >= if exit then
+    then
+    loc @ { "@battle/" BID @ "/battlepoints/" target @ "/PL" }cat PL @ setprop
+    loc @ { "@battle/" BID @ "/battlepoints/" target @ "/attacker" }cat attacker @ setprop
  
 ;
  
+ ( Params: msg )
 : notify_watchers
-var! msg
-      loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
-         tempref @ awake? not if continue then
-  tempref @ location loc @ = not if continue then
- 
-         tempref @ { msg @ }cat notify
-         repeat
+    var! msg
+    var watchers
+    oc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop 
+        stod watchers ! watchers @ awake? not if continue then
+        watchers @ location loc @ = not if continue then
+        watchers @ { msg @ }cat notify
+    repeat
 ;
 
- 
-: divdamage (this is just used to change the division to decimals, round up, then make back into int)
-var! div
-var! hp
- 
-hp @ div @ / dup not if pop 1 then
+ ( Takes param "div" and "hp" )
+: divdamage ( this is just used to change the division to decimals, round up, then make back into int )
+    var! div
+    var! hp
+     
+    hp @ div @ / dup not if pop 1 then
 ;
  
- 
+ ( Takes param "move" )
 : attack_type
-var! move
-POKEDEX { "moves/" move @ "/type" }cat getprop
+    var! move
+    POKEDEX { "moves/" move @ "/type" }cat getprop
 ;
 
-
+( Takes param "id" )
 : hidden_power_type
- var! id
- id @ "Hiddenpower" get dup if exit else pop then
- var ivs
- var type
- ID @ "IVs" get ivs !
-  {
-   ivs @  5 1 midstr
-   ivs @ 10 1 midstr
-   ivs @ 15 1 midstr
-   ivs @ 20 1 midstr
-   ivs @ 25 1 midstr
-   ivs @ 30 1 midstr
- }cat bindec 15 * 63 / type !
+    var! id
+    id @ "Hiddenpower" get dup if exit else pop then
+    var ivs
+    var type
+    ID @ "IVs" get ivs !
+    {
+        ivs @  5 1 midstr
+        ivs @ 10 1 midstr
+        ivs @ 15 1 midstr
+        ivs @ 20 1 midstr
+        ivs @ 25 1 midstr
+        ivs @ 30 1 midstr
+    }cat bindec 15 * 63 / type !
  
- type @ 0  = if "Fighting" exit then
- type @ 1  = if "Flying" exit then
- type @ 2  = if "Poison" exit then
- type @ 3  = if "Ground" exit then
- type @ 4  = if "Rock" exit then
- type @ 5  = if "Bug" exit then
- type @ 6  = if "Ghost" exit then
- type @ 7  = if "Steel" exit then
- type @ 8  = if "Fire" exit then
- type @ 9  = if "Water" exit then
- type @ 10 = if "Grass" exit then
- type @ 11 = if "Electric" exit then
- type @ 12 = if "Psychic" exit then
- type @ 13 = if "Ice" exit then
- type @ 14 = if "Dragon" exit then
- type @ 15 = if "Dark" exit then
- 
-;
- 
- : transform
- (Transform Routine)
-         var! target
-         var! id
-         
-         
-         POKESTORE { "@pokemon/" id @ fid "/@temp/level" }cat id @ FindPokeLevel setprop
-         POKESTORE { "@pokemon/" ID @ fid "/@temp/hiddenpower" }cat target @ hidden_power_type setprop
-         POKESTORE { "@pokemon/" ID @ fid "/@temp/hiddenpowerbasepower" }cat
-          var ivs
-          target @ "IVs" get ivs !
-          {
-           ivs @  4 1 midstr
-           ivs @  9 1 midstr
-           ivs @ 14 1 midstr
-           ivs @ 19 1 midstr
-           ivs @ 24 1 midstr
-           ivs @ 29 1 midstr
-          }cat bindec 40 * 63 / 30 + setprop
- 
-         
-             (attacker is the user of the move, target is the target of the move)
-             (caster @ "maxhp" calculate var! maxhp)
-             POKESTORE { "@pokemon/" id @ fid "/@temp/species" }cat
-               target @ "species" fget
-             setprop
-  
-             POKESTORE { "@pokemon/" id @ fid "/@temp/ability" }cat
-             id @ "status/statmods/abilityremoved" get if
-             pop
-             else
-               target @ "ability" fget
-             setprop
-             then
-  
-             (caster @ "status/hp"
-             caster @ "maxhp" calculate caster @ "status/hp" get atoi * maxhp @ / setto
-             caster @ "status/hp" get atoi 1 < if caster @ "status/hp" 1 setto then
-                 )
-  
-             var temp
-             target @ "movesknown" fgetvals foreach pop temp !
-               POKESTORE { "@pokemon/" id @ fid "/@temp/movesknown/" temp @ }cat 1 setprop
-               POKESTORE { "@pokemon/" id @ fid "/@temp/movesknown/" temp @ "/pp" }cat 5 setprop
-     repeat
-             loc @ { "@battle/" BID @ "/4moves" }cat getprop if
-                 loc @ { "@battle/" BID @ "/movesets/" target @ }cat getprop var! oset
-                 target @ { "movesets/" oset @ "/A" }cat fget var! moveA
-                 target @ { "movesets/" oset @ "/B" }cat fget var! moveB
-                 target @ { "movesets/" oset @ "/C" }cat fget var! moveC
-                 target @ { "movesets/" oset @ "/D" }cat fget var! moveD
-                 Loc @ { "@battle/" BID @ "/movesets/" id @ }cat getprop var! mset
-                 
-                         POKESTORE { "@pokemon/" ID @ fid "/@temp/movesets/" mset @ "/A" }cat moveA @ setprop     
-                         POKESTORE { "@pokemon/" ID @ fid "/@temp/movesets/" mset @ "/B" }cat moveB @ setprop
-                         POKESTORE { "@pokemon/" ID @ fid "/@temp/movesets/" mset @ "/C" }cat moveC @ setprop
-                         POKESTORE { "@pokemon/" ID @ fid "/@temp/movesets/" mset @ "/D" }cat moveD @ setprop
-             then
+    type @ 0  = if "Fighting" exit then
+    type @ 1  = if "Flying" exit then
+    type @ 2  = if "Poison" exit then
+    type @ 3  = if "Ground" exit then
+    type @ 4  = if "Rock" exit then
+    type @ 5  = if "Bug" exit then
+    type @ 6  = if "Ghost" exit then
+    type @ 7  = if "Steel" exit then
+    type @ 8  = if "Fire" exit then
+    type @ 9  = if "Water" exit then
+    type @ 10 = if "Grass" exit then
+    type @ 11 = if "Electric" exit then
+    type @ 12 = if "Psychic" exit then
+    type @ 13 = if "Ice" exit then
+    type @ 14 = if "Dragon" exit then
+    type @ 15 = if "Dark" exit then
+    ( Add ??? type? )
 ;
 
- 
+( Takes param "target" and "id" ) 
+: transform
+    ( Transform Routine )
+    var! target
+    var! id
+
+    POKESTORE { "@pokemon/" id @ fid "/@temp/level" }cat id @ FindPokeLevel setprop
+    POKESTORE { "@pokemon/" ID @ fid "/@temp/hiddenpower" }cat target @ hidden_power_type setprop
+    POKESTORE { "@pokemon/" ID @ fid "/@temp/hiddenpowerbasepower" }cat
+    
+    var ivs
+    target @ "IVs" get ivs !
+    {
+        ivs @  4 1 midstr
+        ivs @  9 1 midstr
+        ivs @ 14 1 midstr
+        ivs @ 19 1 midstr
+        ivs @ 24 1 midstr
+        ivs @ 29 1 midstr
+    }cat bindec 40 * 63 / 30 + setprop
+         
+    (attacker is the user of the move, target is the target of the move)
+    ( caster @ "maxhp" calculate var! maxhp -- delete this? )
+    POKESTORE { 
+        "@pokemon/" id @ fid "/@temp/species" 
+    }cat target @ "species" fget setprop
+  
+    POKESTORE { "@pokemon/" id @ fid "/@temp/ability" }cat
+    id @ "status/statmods/abilityremoved" get if
+        pop
+    else
+       target @ "ability" fget setprop
+    then
+  
+   
+    ( caster @ "status/hp" )
+    ( caster @ "maxhp" calculate caster @ "status/hp" get atoi * maxhp @ / setto )
+    ( caster @ "status/hp" get atoi 1 < if caster @ "status/hp" 1 setto then )
+    
+    var knownMove
+    target @ "movesknown" fgetvals foreach pop knownMove !
+        POKESTORE { "@pokemon/" id @ fid "/@temp/movesknown/" knownMove @ }cat 1 setprop
+        POKESTORE { "@pokemon/" id @ fid "/@temp/movesknown/" knownMove @ "/pp" }cat 5 setprop
+    repeat
+    
+    loc @ { "@battle/" BID @ "/4moves" }cat getprop if
+        loc @ { "@battle/" BID @ "/movesets/" target @ }cat getprop var! oset
+        target @ { "movesets/" oset @ "/A" }cat fget var! moveA
+        target @ { "movesets/" oset @ "/B" }cat fget var! moveB
+        target @ { "movesets/" oset @ "/C" }cat fget var! moveC
+        target @ { "movesets/" oset @ "/D" }cat fget var! moveD
+        Loc @ { "@battle/" BID @ "/movesets/" id @ }cat getprop var! mset
+    
+        POKESTORE { "@pokemon/" ID @ fid "/@temp/movesets/" mset @ "/A" }cat moveA @ setprop     
+        POKESTORE { "@pokemon/" ID @ fid "/@temp/movesets/" mset @ "/B" }cat moveB @ setprop
+        POKESTORE { "@pokemon/" ID @ fid "/@temp/movesets/" mset @ "/C" }cat moveC @ setprop
+        POKESTORE { "@pokemon/" ID @ fid "/@temp/movesets/" mset @ "/D" }cat moveD @ setprop
+    then
+;
+
+( Uses tpos and BID locally )
 $libdef onfield_ability
-: onfield_ability ( ability : 1 or 0 )
+: onfield_ability ( Params: bid, ability : 1 or 0 )
  
-var tpos
-var ttarget
-var found
-var! bid
-var! ability
+    var tpos ( NOT THE GLOBAL vARIABLE )
+    var ttarget(typo?)
+    var found
+    var! bid ( NOT GLOBAL )
+    var! ability
  
-0 found !
-{ "A1" "A2" "A3" "B1" "B2" "B3"  }list foreach tpos ! pop
-loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop ttarget !
-        ttarget @ if
-                ttarget @ "ability" fget ability @ smatch if
-                1 found ! break
-                then
-        then
-repeat
-found @
-; PUBLIC onfield_ability
- 
-$libdef team_ability
-: team_ability (returns the number of times ability is found)
-var! bid
-var! ability
-var! pos
- 
- 
-var tpos
-var ttarget
-var found
-var team
-0 found !
-pos @ 1 1 midstr team !
-{ { team @ "1" }cat { team @ "2" }cat  { team @ "3" }cat }list foreach tpos ! pop
+    0 found !
+    { "A1" "A2" "A3" "B1" "B2" "B3"  }list foreach tpos ! pop
         loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop ttarget !
         ttarget @ if
-                ttarget @ "ability" fget ability @ smatch if
-                found @ 1 + found !
-                then
+            ttarget @ "ability" fget ability @ smatch if
+                1 found ! break
+            then
         then
-repeat
-found @
+    repeat
+    found @
+; PUBLIC onfield_ability
+ 
+( bid, ability, pos, tpos are used locally )
+( params: bid, ability, pos )
+$libdef team_ability
+: team_ability ( returns the number of times ability is found )
+    var! bid
+    var! ability
+    var! pos
+ 
+    var tpos
+    var ttarget ( again, typo? )
+    var found
+    var team
+    0 found !
+    pos @ 1 1 midstr team !
+    { { team @ "1" }cat { team @ "2" }cat  { team @ "3" }cat }list foreach tpos ! pop
+        loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop ttarget !
+        ttarget @ if
+            ttarget @ "ability" fget ability @ smatch if
+                found @ 1 + found !
+            then
+        then
+    repeat
+    found @
 ; PUBLIC team_ability
 
-
+( Params: iuser, ipos )
 : can_use_hold_item
-var! iuser
-var! ipos
+    var! iuser
+    var! ipos
 
-ipos @ "A*" smatch if "B" else "A" then var! ioppteam
+    ipos @ "A*" smatch if "B" else "A" then var! ioppteam
 
-iuser @ "status/statmods/embargo" get not 
-iuser @ "ability" fget "klutz" smatch not 
-loc @ { "@battle/" BID @ "/MagicRoom" }cat getprop not 
-ioppteam @ "Unnerve" bid @ team_ability iuser @ "holding" get "*berry" smatch and not
-and and and if 1 else 0 then
+    ( Move the "and"s around )
+    iuser @ "status/statmods/embargo" get not 
+    iuser @ "ability" fget "klutz" smatch not 
+    loc @ { "@battle/" BID @ "/MagicRoom" }cat getprop not 
+    ioppteam @ "Unnerve" bid @ team_ability iuser @ "holding" get "*berry" smatch and not
+    and and and if 1 else 0 then
 ;
  
+( Params: bid ) 
+( Uses weather, bid locally )
 $libdef check_weather
- 
-: check_weather (returns the weather)
-var! bid
-var weather
- 
-loc @ { "@battle/" bid @ "/roomweather" }cat getprop dup not if pop "none" then
-weather !
- 
-weather @ "none" smatch not if
+: check_weather ( returns the weather )
+    var! bid ( Not global )
+    var weather
+     
+    loc @ { "@battle/" bid @ "/roomweather" }cat getprop dup not if pop "none" then
+    weather !
+     
+    weather @ "none" smatch not if
         "Air Lock" bid @ onfield_ability
         "Cloud Nine" bid @ onfield_ability
         or
         if
-        "none" weather !
+            "none" weather !
         then
-then
-weather @
+    then
+    weather @
 ; PUBLIC check_weather
 
-: moldbreaker (this is done after the ability smatch, if it has a 0 then skip this and return 0, if it has a 1 then do the check for the ability. return a 0 if broken and a 1 if not)
-(Don't have an and or an or after this if you are trying to compare it)
-var! targ
-var! sresult
+( this is done after the ability smatch, if it has a 0 then skip this and return 0, 
+  if it has a 1 then do the check for the ability. return a 0 if broken and a 1 if not 
+)
+( Params: targ, sresult )
+: moldbreaker 
+    ( Don't have an "and" or an "or" after this if you are trying to compare it )
+    var! targ
+    var! sresult
 
-sresult @ not if 0 exit then
+    sresult @ not if 0 exit then
 
-targ @ "Ability" fget var! uabil
+    targ @ "Ability" fget var! uabil
 
-uabil @ "mold breaker" smatch
-uabil @ "Turboblaze" smatch or
-uabil @ "Teravolt" smatch or if
-
-   loc @ { "@battle/" BID @ "/temp/moldbreakermessage" }cat getprop not if
-           loc @ { "@battle/" BID @ "/temp/moldbreakermessage" }cat 1 setprop
-           uabil @ "mold breaker" smatch if
-          { "^[o^[y" targ @ id_name " breaks the mold!" }cat notify_watchers
-          then
-             uabil @ "Turboblaze" smatch if
-            { "^[o^[y" targ @ id_name " is radiating a blazing aura!" }cat notify_watchers
-          then
-             uabil @ "Teravolt" smatch if
-            { "^[o^[y" targ @ id_name " is radiating a bursting aura!" }cat notify_watchers
-          then
-
-
-  0
-  else
-  1
-  then
-else
-1
-then
+    uabil @ "mold breaker" smatch
+    uabil @ "Turboblaze" smatch or
+    uabil @ "Teravolt" smatch or if
+        loc @ { "@battle/" BID @ "/temp/moldbreakermessage" }cat getprop not if
+            loc @ { "@battle/" BID @ "/temp/moldbreakermessage" }cat 1 setprop
+            uabil @ "mold breaker" smatch if
+                { "^[o^[y" targ @ id_name " breaks the mold!" }cat notify_watchers
+            then
+            uabil @ "Turboblaze" smatch if
+                { "^[o^[y" targ @ id_name " is radiating a blazing aura!" }cat notify_watchers
+            then
+            uabil @ "Teravolt" smatch if
+                { "^[o^[y" targ @ id_name " is radiating a bursting aura!" }cat notify_watchers
+            then
+            0
+        else
+            1
+        then
+    else
+        1
+    then
 ;
  
+( Params: user )
 $libdef check_status
 : check_status 
 var! user
-                user @ "status/poisoned" get if "poisoned" exit then
-                user @ "status/toxic" get if "toxic" exit then
-                user @ "status/burned" get if "burned" exit then
-                user @ "status/asleep" get if "asleep" exit then
-                user @ "status/paralyzed" get if "paralyzed" exit then
-                user @ "status/frozen" get if "frozen" exit then
-                0
+    user @ "status/poisoned" get if "poisoned" exit then
+    user @ "status/toxic" get if "toxic" exit then
+    user @ "status/burned" get if "burned" exit then
+    user @ "status/asleep" get if "asleep" exit then
+    user @ "status/paralyzed" get if "paralyzed" exit then
+    user @ "status/frozen" get if "frozen" exit then
+    0
 ; PUBLIC check_status
 
+( Params: wt )
+( Rename wt into something much better )
 $libdef weightcalc
 : weightcalc
-var! wt
-POKEDEX { "pokemon/" wt @ "species" fget "/weight" }Cat getprop " " "lb" subst strip strtof var! weight
-wt @ "status/statmods/Autotomize" get if weight @ 2 / weight ! then
-wt @ "ability" fget "heavy metal" smatch if
+    var! wt
+    POKEDEX { "pokemon/" wt @ "species" fget "/weight" }cat getprop " " "lb" subst strip strtof var! weight
+    
+    wt @ "status/statmods/Autotomize" get if weight @ 2 / weight ! then
+    
+    wt @ "ability" fget "heavy metal" smatch if
         weight @ 2 * weight !
-then
-wt @ "ability" fget "light metal" smatch if
+    then
+    
+    wt @ "ability" fget "light metal" smatch if
         weight @ 2 / weight !
-then
+    then
 
-weight @
-
+    weight @
 ; PUBLIC weightcalc
 
- 
+
+( Params: target, possibly more values implied on stack )
 $libdef eatberry
 : eatberry
-var! target
-loc @ { "@battle/" BID @ "/EatenBerry/" target @ }cat target @ "holding" get setprop
-target @ "holding" "Nothing" setto
-target @ "happiness" over over fget atoi 1 + fsetto
-target @ "happiness" fget atoi 255 > if
-target @ "happiness" 255 fsetto
-
-then
- 
+    var! target
+    
+    loc @ { "@battle/" BID @ "/EatenBerry/" target @ }cat target @ "holding" get setprop
+    
+    target @ "holding" "Nothing" setto
+    target @ "happiness" over over fget atoi 1 + fsetto
+    target @ "happiness" fget atoi 255 > if
+        target @ "happiness" 255 fsetto
+    then
 ; PUBLIC eatberry
 
- 
+
+( Params: tpos )
+( Uses tpos, who, locally )
+( Uses global berryeffect, weaken, BID, misshurtself )
 : typetotalcalculate
- var! tpos
- loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop var! who
-        1
- 
-        " " weaken !
-        POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
-        berryeffect @
-        tpos @ who @ can_use_hold_item and
-        if
+    var! tpos
+    loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop var! who
+    1
+
+    " " weaken !
+    POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
+    
+    ( Berry modifying "weaken" - make its own function? )
+    berryeffect @
+    tpos @ who @ can_use_hold_item and
+    if
         berryeffect @ ":" explode_array foreach effect ! pop
-                effect @ "weaken*" smatch if
-                        effect @ " " "Weaken" subst strip weaken !
-                        continue
-                then
+        effect @ "weaken*" smatch if
+            effect @ " " "Weaken" subst strip weaken !
+            continue
+        then
         repeat
         POKEDEX { "items/" who @ "holding" get "/Conditional" }cat getprop weakenstip !
-        then
- 
-        var whotype
-        var lasttype
-        "" lasttype !
-        who @ typelist foreach swap pop dup whotype !
+    then
+
+    var whotype
+    var lasttype
+    
+    "" lasttype !
+    who @ typelist foreach swap pop dup whotype !
         who @ "status/statmods/roost" get 
-        who @ "status/statmods/smackdown" get or
-        if
-        whotype @ "flying" smatch if who @ typelist array_count 1 = if "Normal" whotype ! pop whotype @ else pop continue then then
+        who @ "status/statmods/smackdown" get or if
+            whotype @ "flying" smatch if 
+                who @ typelist array_count 1 = if 
+                    "Normal" whotype ! pop whotype @ 
+                else 
+                    pop continue 
+                then
+            then
         then
+        
         whotype @ lasttype @ smatch if pop continue then
         whotype @ lasttype !
         ( { "Whotype: " whotype @  }cat "Debug" pretty notify_watchers )
         misshurtself @
         whotype @ "ghost" smatch and if pop continue then
- 
+
+        ( Could this be cleaned up a bit? - moved to its own function perhaps? )
+        ( The variable effect is being used in a different context! Replace it with a new variable )
         whotype @ "Ghost" smatch
         movetype @ "fighting" smatch
         movetype @ "normal" smatch or and
@@ -395,86 +423,93 @@ then
         whotype @ "dark" smatch and
         who @ "status/statmods/Miracle Eye" get and or
         not if
-         { "typetable/" movetype @ "/" }cat swap strcat user @ swap get strtof
-         effect !
-                who @ "ability" fget "levitate" smatch
-                user @ moldbreaker
-                who @ "status/statmods/Magnet Rise" get 
-                who @ "status/statmods/telekinesis" get or
-                loc @ { "@battle/" BID @ "/gravity" }cat getprop not and or
-                who @ "status/statmods/ingrain/move" get not and
-                who @ "holding" get stringify "iron ball" smatch not and
-                if
+            { "typetable/" movetype @ "/" }cat swap strcat user @ swap get strtof
+            effect !
+            who @ "ability" fget "levitate" smatch
+            user @ moldbreaker
+            who @ "status/statmods/Magnet Rise" get 
+            who @ "status/statmods/telekinesis" get or
+            loc @ { "@battle/" BID @ "/gravity" }cat getprop not and or
+            who @ "status/statmods/ingrain/move" get not and
+            who @ "holding" get stringify "iron ball" smatch not and
+            if
                 movetype @ "ground" smatch if
-                -1.0 effect !
+                    -1.0 effect !
                 then
-                then
- 
-                loc @ { "@battle/"BID @ "/gravity" }cat getprop
-                who @ "status/statmods/ingrain/move" get or
-                who @ "holding" get stringify "iron ball" smatch or
-                if
+            then
+
+            loc @ { "@battle/"BID @ "/gravity" }cat getprop
+            who @ "status/statmods/ingrain/move" get or
+            who @ "holding" get stringify "iron ball" smatch or
+            if
                 whotype @ "flying" smatch
                 movetype @ "ground" smatch and
                 if
-                0 effect !
+                    0 effect !
                 then
-                then
- 
-         movetype @ weaken @ smatch if
+            then
+
+            movetype @ weaken @ smatch if
                 weakenstip @
                 effect @ 0 > and
                 weakenstip @ not or
                 if
-                effect @ 0.5 * effect !
-                { "^[o^[c" who @ id_name "^[y weakened the attack by eating its ^[c" who @ "holding" get "^[y!" }cat notify_watchers
-                who @ eatberry
+                    effect @ 0.5 * effect !
+                    { "^[o^[c" who @ id_name "^[y weakened the attack by eating its ^[c" who @ "holding" get "^[y!" }cat notify_watchers
+                    who @ eatberry
                 then
-         then
- 
-         effect @ 1 + *
-         else  (this else is for miracle eye)
-         1
+            then
+
+            effect @ 1 + *
+        else  (this else is for miracle eye)
+            1
         then
-        repeat
- 
- 
+    repeat
+
+
 ;
 
-
-
+( Params: damage )
+( Uses damage locally )
+( Uses who, tpos globally )
 : substitute_damage
-var! damage
-who @ "status/statmods/substitute" over over get atoi damage @ - setto
-{ "^[o^[c" tpos @ "." who @ id_name "'s^[y substitute took its damage!" }cat notify_watchers
-who @ "status/statmods/substitute" get atoi 1 < if
-"^[o^[yThe substitute broke!" notify_watchers
-who @ "status/statmods/substitute" 0 setto
-then
+    var! damage
+    who @ "status/statmods/substitute" over over get atoi damage @ - setto
+    { "^[o^[c" tpos @ "." who @ id_name "'s^[y substitute took its damage!" }cat notify_watchers
+    
+    who @ "status/statmods/substitute" get atoi 1 < if
+        "^[o^[yThe substitute broke!" notify_watchers
+        who @ "status/statmods/substitute" 0 setto
+    then
 ;
+
+( Params: target )
+( Uses Weather locally )
+( Uses BID globally )
 $libdef forecast
 : forecast
-var! target
- 
-target @ "species" fget "351" smatch not if exit then
- 
-bid @ check_weather var! weather
- 
-weather @ "rain dance" smatch if
-target @ "status/statmods/type" "Water" setto
-exit
-then
- 
-weather @ "sunny day" smatch if
-target @ "status/statmods/type" "Fire" setto
-exit
-then
- 
-weather @ "Hail" smatch if
-target @ "status/statmods/type" "Ice" setto
-exit
-then
+    var! target
+     
+    target @ "species" fget "351" smatch not if exit then
+     
+    bid @ check_weather var! weather ( check_weather is an earlier function )
+     
+    weather @ "rain dance" smatch if
+        target @ "status/statmods/type" "Water" setto
+        exit
+    then
+     
+    weather @ "sunny day" smatch if
+        target @ "status/statmods/type" "Fire" setto
+        exit
+    then
+     
+    weather @ "Hail" smatch if
+        target @ "status/statmods/type" "Ice" setto
+        exit
+    then
 ; PUBLIC forecast
+ 
  
 $libdef switch_check
 : switch_check (bid, pos)

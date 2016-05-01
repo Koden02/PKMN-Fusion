@@ -15,12 +15,14 @@ How to join this MUCK
 ---------------------
 To access this MUCK, a MUCK, MUD or similar client is needed. A list of clients can be found [here](https://en.wikipedia.org/wiki/Comparison_of_MUD_clients). Then the client will need to connect to the MUCK's address using the MUCK's port number. How this is done varies by client.
 
-Server Address: pokemonfusion.servegame.org
+Server Address: pokemonfusion.servegame.org \
 Port Number: 4321
 
-Also, please check our wiki for info on theme, setting, code of conduct, further detail on connecting, and other important and useful information!
-
+Please check our wiki for info on theme, setting, code of conduct, further detail on connecting, and other important and useful information!\
 http://pokemonfusion.servegame.org/index.php?title=Main_Page
+
+Also, check us out on mud connector!\
+http://www.mudconnect.com/mud-bin/adv_search.cgi?Mode=MUD&mud=Pokemon+Fusion
 
 TL;DR
 -----
