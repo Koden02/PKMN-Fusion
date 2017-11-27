@@ -1,0 +1,16 @@
+@set #4=/moves/Flying Press/Accuracy:95
+@set #4=/moves/Flying Press/Class:Physical
+@set #4=/moves/Flying Press/contact?:yes
+@set #4=/moves/Flying Press/desc:The user dives down onto the target from the sky. This move is Fighting and Flying type simultaneously.
+@set #4=/moves/Flying Press/protect?:yes
+@set #4=/moves/Flying Press/target:enemy
+@set #4=/moves/Flying Press/type:Fighting
+@set #4=/moves/Flying Press/type2:Flying
+@set #4=/moves/Flying Press/Name:Flying Press
+@set #4=/moves/Flying Press/power:100
+@set #4=/moves/Flying Press/pp:10
+@set #4=/moves/Flying Press/priority:0
+@set #4=/moves/Flying Press/Stomp:yes
+
+@set #4=/moves/Stomp/Stomp:yes
+@set #4=/moves/Steamroller/Stomp:yes

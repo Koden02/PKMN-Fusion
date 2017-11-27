@@ -350,10 +350,9 @@ then
  
 ; PUBLIC eatberry
 
- 
-: typetotalcalculate
- var! temp_position
- loc @ { "@battle/" BID @ "/position/" temp_position @ }cat getprop var! defender
+: typetotalcalculatefunction
+var! defender
+var! move_type (different than movetype, just roll with it)
         1
  
         " " weaken !
@@ -370,32 +369,32 @@ then
         POKEDEX { "items/" defender @ "holding" get "/Conditional" }cat getprop weaken_stipulation !
         then
  
-        var whotype
+        var defender_type
         var lasttype
         "" lasttype !
-        defender @ typelist foreach swap pop dup whotype !
+        defender @ typelist foreach swap pop dup defender_type !
         defender @ "status/statmods/roost" get 
         defender @ "status/statmods/smackdown" get or
         if
-        whotype @ "flying" smatch if defender @ typelist array_count 1 = if "Normal" whotype ! pop whotype @ else pop continue then then
+        defender_type @ "flying" smatch if defender @ typelist array_count 1 = if "Normal" defender_type ! pop defender_type @ else pop continue then then
         then
-        whotype @ lasttype @ smatch if pop continue then
-        whotype @ lasttype !
-        ( { "Whotype: " whotype @  }cat "Debug" pretty notify_watchers )
+        defender_type @ lasttype @ smatch if pop continue then
+        defender_type @ lasttype !
+        ( { "defender_type: " defender_type @  }cat "Debug" pretty notify_watchers )
         misshurtself @
-        whotype @ "ghost" smatch and if pop continue then
+        defender_type @ "ghost" smatch and if pop continue then
  
-        whotype @ "Ghost" smatch
-        movetype @ "fighting" smatch
-        movetype @ "normal" smatch or and
+        defender_type @ "Ghost" smatch
+        move_type @ "fighting" smatch
+        move_type @ "normal" smatch or and
         defender @ "status/statmods/foresight" get
         user @ "ability" fget "Scrappy" smatch or
         and
-        movetype @ "psychic" smatch
-        whotype @ "dark" smatch and
+        move_type @ "psychic" smatch
+        defender_type @ "dark" smatch and
         defender @ "status/statmods/Miracle Eye" get and or
         not if
-         { "typetable/" movetype @ "/" }cat swap strcat user @ swap get strtof
+         { "typetable/" move_type @ "/" }cat swap strcat user @ swap get strtof
          effect !
                 defender @ "ability" fget "levitate" smatch
                 user @ moldbreaker
@@ -405,23 +404,23 @@ then
                 defender @ "status/statmods/ingrain/move" get not and
                 defender @ "holding" get stringify "iron ball" smatch not and
                 if
-                movetype @ "ground" smatch if
+                move_type @ "ground" smatch if
                 -1.0 effect !
                 then
                 then
  
-                loc @ { "@battle/"BID @ "/gravity" }cat getprop
+                loc @ { "@battle/" BID @ "/gravity" }cat getprop
                 defender @ "status/statmods/ingrain/move" get or
                 defender @ "holding" get stringify "iron ball" smatch or
                 if
-                whotype @ "flying" smatch
-                movetype @ "ground" smatch and
+                defender_type @ "flying" smatch
+                move_type @ "ground" smatch and
                 if
                 0 effect !
                 then
                 then
  
-         movetype @ weaken @ smatch if
+         move_type @ weaken @ smatch if
                 weaken_stipulation @
                 effect @ 0 > and
                 weaken_stipulation @ not or
@@ -437,8 +436,18 @@ then
          1
         then
         repeat
+;
  
- 
+: typetotalcalculate
+ var! temp_position
+ loc @ { "@battle/" BID @ "/position/" temp_position @ }cat getprop var! defender
+
+ defender @ POKEDEX {"moves/" move @ "/type" }cat getprop typetotalcalculatefunction var! typetotal
+ POKEDEX {"moves/" move @ "/type2" }cat getprop if
+			defender @ POKEDEX {"moves/" move @ "/type2" }cat getprop typetotalcalculatefunction typetotal @ * typetotal !
+		then
+		
+typetotal @
 ;
 
 
@@ -1830,6 +1839,15 @@ move @ "Acrobatics" smatch if
         attacker @ "holding" get "Nothing" smatch if 110 else 55 then
 exit
 then
+
+
+ (check if defender had used minimize if the attack is a stomp attributed attack)
+ POKEDEX { "moves/" move @ "/stomp" }cat getprop if
+	defender @ "status/statmods/SuccessfulMoves/minimize" get if
+		basepower @ 2 *
+		exit
+	then
+ then
  
 basepower @ (use this if it never changes)
 ;
@@ -4849,12 +4867,12 @@ move @ "doom desire" smatch or not if
  user @ moldbreaker
  if 1.20 /  then
  
-  var! WhoEva
+  var! Defender_Evade
  
- defender @ "holding" get "brightpowder" smatch temp_position @ defender @ can_use_hold_item and if WhoEva @ 0.10 - WhoEva ! then
- defender @ "holding" get "lax incense" smatch temp_position @ defender @ can_use_hold_item and if WhoEva @ 0.05 - WhoEva ! then
- defender @ "status/statmods/foresight" get WhoEva @ 1.0 < and if
- 1.0 WhoEva ! then
+ defender @ "holding" get "brightpowder" smatch temp_position @ defender @ can_use_hold_item and if Defender_Evade @ 0.10 - Defender_Evade ! then
+ defender @ "holding" get "lax incense" smatch temp_position @ defender @ can_use_hold_item and if Defender_Evade @ 0.05 - Defender_Evade ! then
+ defender @ "status/statmods/foresight" get Defender_Evade @ 1.0 < and if
+ 1.0 Defender_Evade ! then
  
  
  var moveaccuracy
@@ -4892,7 +4910,7 @@ move @ "doom desire" smatch or not if
  moveaccuracy @ 1.3 * floor moveaccuracy !
  then
  
- moveaccuracy @ UserAcc @ * WhoEva @ * 0.01 * accuracy !
+ moveaccuracy @ UserAcc @ * Defender_Evade @ * 0.01 * accuracy !
  
  then
  
@@ -4914,6 +4932,12 @@ move @ "doom desire" smatch or not if
  1.0 accuracy !
  then
 
+ (check if defender had used minimize if the attack is a stomp attributed attack)
+ POKEDEX { "moves/" move @ "/stomp" }cat getprop if
+	defender @ "status/statmods/SuccessfulMoves/minimize" get if
+		1.0 accuracy !
+	then
+ then
  
  defender @ "status/statmods/freehit/caster" get attacker @ stringify smatch if
  1.0 accuracy !
@@ -5006,7 +5030,7 @@ position @ 1 1 midstr temp_position @ 1 1 midstr smatch defender @ "ability" fge
         then
 then
  
- ( { "^[o^[cAccuracy: " moveaccuracy @ "  user acc: " useracc @ "  whoeva: " whoeva @ "  accuracy: " accuracy @ }Cat "Debug" pretty notify_watchers )
+ ( { "^[o^[cAccuracy: " moveaccuracy @ "  user acc: " useracc @ "  Defender_Evade: " Defender_Evade @ "  accuracy: " accuracy @ }Cat "Debug" pretty notify_watchers )
  
  
  frand accuracy @ > if
@@ -5886,6 +5910,9 @@ then
         STAB !
  
         temp_position @ typetotalcalculate var! typetotal
+		POKEDEX {"moves/" move @ "/type2" }cat getprop if
+			
+		then
  
         (typetotal @ 100 * typetotal !)
         ( defender @ typetotal @ intostr "DefenseTypeImmunity" CheckTriggers atoi 100.0 / typetotal ! )
