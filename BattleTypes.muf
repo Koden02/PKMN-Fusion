@@ -2,8 +2,10 @@ $include #3 (ansilib.muf)
 $include #6 (Useful.muf)
 $include #47 (DLadapter.muf)
 $include #48 (CalculateStats.muf)
+$include #196 (triggers)
 $include #200 (RandomPokemonGenerater.muf)
 $include #204 (BattleStartInterface.muf)
+$include #299 (Daycare.muf / Hatching Code)
 $include #598 
 $include $RP/combat/NPCGen
  
@@ -56,7 +58,6 @@ then
         break
         then
         repeat
-then
 
 me @ trainclass @ mytier @ "wild" maketrainer
 ;
@@ -964,11 +965,12 @@ me @ "total walked steps" over over get atoi steps @ + setto
 var totalsteps
 me @ "fusion" get if me @ "status/hp" get if me @ "walked steps" over over fget atoi steps @ + totalsteps !  totalsteps @ 256 >= if totalsteps @ 256 - totalsteps ! me @ "happiness" over over fget atoi me @ "holding" get "soothe bell" smatch if 2 else 1 then + fsetto then totalsteps @ fsetto  then then
 me @ "happiness" over over fget atoi dup 255 > if pop 255 then fsetto
+me @ GetHatchingFactor var! hatchingFactor
 var count
 var poke
 1 6 1 for count !
  me @ { "slot/" count @ }cat get poke !
- poke @ "egg?" get if poke @ "egg?" over over get atoi steps @ -  setto 
+ poke @ "egg?" get if poke @ "egg?" over over get atoi steps @ hatchingFactor @ * - setto 
      poke @ "egg?" get atoi 0 <= if
        me @ "Your egg is hatching!" "Egg" pretty notify
        me @ { "@achieve/poke-owned/" poke @  "species" get  }cat over over getprop 1 + setprop
