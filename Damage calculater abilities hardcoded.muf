@@ -6,11 +6,11 @@ $include $rp/combat/End
 $include $rp/combat/AI
  
 var arg
-var pos
-var tpos
+var position
+var temp_position
 var BID
 var attacker
-var who
+var defender
 var move
 var tempref
 var accuracy
@@ -18,11 +18,11 @@ var user
 var movetype
 var attack
 var defense
-var tmove
-var ttype
+var target_move
+var target_move_type
 var turncount
-var tkcount
-var tkdamage
+var triple_kick_count
+var triple_kick_damage
 var oldval
 var lastmove
 var stockpile
@@ -31,7 +31,7 @@ var weather
 var berryeffect
 var effect
 var weaken
-var weakenstip
+var weaken_stipulation
 var heal
 var misshurtself
  
@@ -76,7 +76,7 @@ loc @ { "@battle/" BID @ "/battlepoints/" target @ "/attacker" }cat attacker @ s
  
 : notify_watchers
 var! msg
-      loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+      loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
          tempref @ awake? not if continue then
   tempref @ location loc @ = not if continue then
  
@@ -197,17 +197,17 @@ POKEDEX { "moves/" move @ "/type" }cat getprop
 $libdef onfield_ability
 : onfield_ability ( ability : 1 or 0 )
  
-var tpos
-var ttarget
+var temp_position
+var temp_target
 var found
-var! bid
+var! BID
 var! ability
  
 0 found !
-{ "A1" "A2" "A3" "B1" "B2" "B3"  }list foreach tpos ! pop
-loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop ttarget !
-        ttarget @ if
-                ttarget @ "ability" fget ability @ smatch if
+{ "A1" "A2" "A3" "B1" "B2" "B3"  }list foreach temp_position ! pop
+loc @ { "@battle/" BID @ "/position/" temp_position @ }cat getprop temp_target !
+        temp_target @ if
+                temp_target @ "ability" fget ability @ smatch if
                 1 found ! break
                 then
         then
@@ -217,21 +217,21 @@ found @
  
 $libdef team_ability
 : team_ability (returns the number of times ability is found)
-var! bid
+var! BID
 var! ability
-var! pos
+var! position
  
  
-var tpos
-var ttarget
+var temp_position
+var temp_target
 var found
 var team
 0 found !
-pos @ 1 1 midstr team !
-{ { team @ "1" }cat { team @ "2" }cat  { team @ "3" }cat }list foreach tpos ! pop
-        loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop ttarget !
-        ttarget @ if
-                ttarget @ "ability" fget ability @ smatch if
+position @ 1 1 midstr team !
+{ { team @ "1" }cat { team @ "2" }cat  { team @ "3" }cat }list foreach temp_position ! pop
+        loc @ { "@battle/" BID @ "/position/" temp_position @ }cat getprop temp_target !
+        temp_target @ if
+                temp_target @ "ability" fget ability @ smatch if
                 found @ 1 + found !
                 then
         then
@@ -241,30 +241,30 @@ found @
 
 
 : can_use_hold_item
-var! iuser
-var! ipos
+var! inv_user
+var! inv_position
 
-ipos @ "A*" smatch if "B" else "A" then var! ioppteam
+inv_position @ "A*" smatch if "B" else "A" then var! ioppteam
 
-iuser @ "status/statmods/embargo" get not 
-iuser @ "ability" fget "klutz" smatch not 
+inv_user @ "status/statmods/embargo" get not 
+inv_user @ "ability" fget "klutz" smatch not 
 loc @ { "@battle/" BID @ "/MagicRoom" }cat getprop not 
-ioppteam @ "Unnerve" bid @ team_ability iuser @ "holding" get "*berry" smatch and not
+ioppteam @ "Unnerve" BID @ team_ability inv_user @ "holding" get "*berry" smatch and not
 and and and if 1 else 0 then
 ;
  
 $libdef check_weather
  
 : check_weather (returns the weather)
-var! bid
+var! BID
 var weather
  
-loc @ { "@battle/" bid @ "/roomweather" }cat getprop dup not if pop "none" then
+loc @ { "@battle/" BID @ "/roomweather" }cat getprop dup not if pop "none" then
 weather !
  
 weather @ "none" smatch not if
-        "Air Lock" bid @ onfield_ability
-        "Cloud Nine" bid @ onfield_ability
+        "Air Lock" BID @ onfield_ability
+        "Cloud Nine" BID @ onfield_ability
         or
         if
         "none" weather !
@@ -280,21 +280,21 @@ var! sresult
 
 sresult @ not if 0 exit then
 
-targ @ "Ability" fget var! uabil
+targ @ "Ability" fget var! user_ability
 
-uabil @ "mold breaker" smatch
-uabil @ "Turboblaze" smatch or
-uabil @ "Teravolt" smatch or if
+user_ability @ "mold breaker" smatch
+user_ability @ "Turboblaze" smatch or
+user_ability @ "Teravolt" smatch or if
 
    loc @ { "@battle/" BID @ "/temp/moldbreakermessage" }cat getprop not if
            loc @ { "@battle/" BID @ "/temp/moldbreakermessage" }cat 1 setprop
-           uabil @ "mold breaker" smatch if
+           user_ability @ "mold breaker" smatch if
           { "^[o^[y" targ @ id_name " breaks the mold!" }cat notify_watchers
           then
-             uabil @ "Turboblaze" smatch if
+             user_ability @ "Turboblaze" smatch if
             { "^[o^[y" targ @ id_name " is radiating a blazing aura!" }cat notify_watchers
           then
-             uabil @ "Teravolt" smatch if
+             user_ability @ "Teravolt" smatch if
             { "^[o^[y" targ @ id_name " is radiating a bursting aura!" }cat notify_watchers
           then
 
@@ -352,14 +352,14 @@ then
 
  
 : typetotalcalculate
- var! tpos
- loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop var! who
+ var! temp_position
+ loc @ { "@battle/" BID @ "/position/" temp_position @ }cat getprop var! defender
         1
  
         " " weaken !
-        POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
+        POKEDEX { "items/" defender @ "holding" get "/holdeffect" }cat getprop berryeffect !
         berryeffect @
-        tpos @ who @ can_use_hold_item and
+        temp_position @ defender @ can_use_hold_item and
         if
         berryeffect @ ":" explode_array foreach effect ! pop
                 effect @ "weaken*" smatch if
@@ -367,17 +367,17 @@ then
                         continue
                 then
         repeat
-        POKEDEX { "items/" who @ "holding" get "/Conditional" }cat getprop weakenstip !
+        POKEDEX { "items/" defender @ "holding" get "/Conditional" }cat getprop weaken_stipulation !
         then
  
         var whotype
         var lasttype
         "" lasttype !
-        who @ typelist foreach swap pop dup whotype !
-        who @ "status/statmods/roost" get 
-        who @ "status/statmods/smackdown" get or
+        defender @ typelist foreach swap pop dup whotype !
+        defender @ "status/statmods/roost" get 
+        defender @ "status/statmods/smackdown" get or
         if
-        whotype @ "flying" smatch if who @ typelist array_count 1 = if "Normal" whotype ! pop whotype @ else pop continue then then
+        whotype @ "flying" smatch if defender @ typelist array_count 1 = if "Normal" whotype ! pop whotype @ else pop continue then then
         then
         whotype @ lasttype @ smatch if pop continue then
         whotype @ lasttype !
@@ -388,22 +388,22 @@ then
         whotype @ "Ghost" smatch
         movetype @ "fighting" smatch
         movetype @ "normal" smatch or and
-        who @ "status/statmods/foresight" get
+        defender @ "status/statmods/foresight" get
         user @ "ability" fget "Scrappy" smatch or
         and
         movetype @ "psychic" smatch
         whotype @ "dark" smatch and
-        who @ "status/statmods/Miracle Eye" get and or
+        defender @ "status/statmods/Miracle Eye" get and or
         not if
          { "typetable/" movetype @ "/" }cat swap strcat user @ swap get strtof
          effect !
-                who @ "ability" fget "levitate" smatch
+                defender @ "ability" fget "levitate" smatch
                 user @ moldbreaker
-                who @ "status/statmods/Magnet Rise" get 
-                who @ "status/statmods/telekinesis" get or
+                defender @ "status/statmods/Magnet Rise" get 
+                defender @ "status/statmods/telekinesis" get or
                 loc @ { "@battle/" BID @ "/gravity" }cat getprop not and or
-                who @ "status/statmods/ingrain/move" get not and
-                who @ "holding" get stringify "iron ball" smatch not and
+                defender @ "status/statmods/ingrain/move" get not and
+                defender @ "holding" get stringify "iron ball" smatch not and
                 if
                 movetype @ "ground" smatch if
                 -1.0 effect !
@@ -411,8 +411,8 @@ then
                 then
  
                 loc @ { "@battle/"BID @ "/gravity" }cat getprop
-                who @ "status/statmods/ingrain/move" get or
-                who @ "holding" get stringify "iron ball" smatch or
+                defender @ "status/statmods/ingrain/move" get or
+                defender @ "holding" get stringify "iron ball" smatch or
                 if
                 whotype @ "flying" smatch
                 movetype @ "ground" smatch and
@@ -422,13 +422,13 @@ then
                 then
  
          movetype @ weaken @ smatch if
-                weakenstip @
+                weaken_stipulation @
                 effect @ 0 > and
-                weakenstip @ not or
+                weaken_stipulation @ not or
                 if
                 effect @ 0.5 * effect !
-                { "^[o^[c" who @ id_name "^[y weakened the attack by eating its ^[c" who @ "holding" get "^[y!" }cat notify_watchers
-                who @ eatberry
+                { "^[o^[c" defender @ id_name "^[y weakened the attack by eating its ^[c" defender @ "holding" get "^[y!" }cat notify_watchers
+                defender @ eatberry
                 then
          then
  
@@ -445,11 +445,11 @@ then
 
 : substitute_damage
 var! damage
-who @ "status/statmods/substitute" over over get atoi damage @ - setto
-{ "^[o^[c" tpos @ "." who @ id_name "'s^[y substitute took its damage!" }cat notify_watchers
-who @ "status/statmods/substitute" get atoi 1 < if
+defender @ "status/statmods/substitute" over over get atoi damage @ - setto
+{ "^[o^[c" temp_position @ "." defender @ id_name "'s^[y substitute took its damage!" }cat notify_watchers
+defender @ "status/statmods/substitute" get atoi 1 < if
 "^[o^[yThe substitute broke!" notify_watchers
-who @ "status/statmods/substitute" 0 setto
+defender @ "status/statmods/substitute" 0 setto
 then
 ;
 $libdef forecast
@@ -458,7 +458,7 @@ var! target
  
 target @ "species" fget "351" smatch not if exit then
  
-bid @ check_weather var! weather
+BID @ check_weather var! weather
  
 weather @ "rain dance" smatch if
 target @ "status/statmods/type" "Water" setto
@@ -477,15 +477,15 @@ then
 ; PUBLIC forecast
  
 $libdef switch_check
-: switch_check (bid, pos)
-pos !
-bid !
+: switch_check (BID, position)
+position !
+BID !
  
        var team
        var id
        var notvalid
  
-       pos @ 1 1  midstr team !
+       position @ 1 1  midstr team !
        loc @ { "@battle/" BID @ "/temp/validstats/" team @ }cat remove_prop
  
                 loc @ { "@battle/" BID @ "/teams/" team @ "/" }cat array_get_propvals foreach id ! pop
@@ -507,14 +507,14 @@ bid !
         switchable @
 ; PUBLIC switch_check
  
-$libdef placed_abilities (pos, bid)
+$libdef placed_abilities (position, BID)
 : placed_abilities (this is for abilities that are placed, this isn't used to check if one is in effect)
 BID !
-pos !
+position !
  
 var oteam
  
-pos @ "A*" smatch if
+position @ "A*" smatch if
 "B" oteam !
 else
 "A" oteam !
@@ -522,7 +522,7 @@ then
  
 var target
  
-loc @ { "@battle/" BID @ "/position/" pos @ }cat getprop target !
+loc @ { "@battle/" BID @ "/position/" position @ }cat getprop target !
  
 target @ "ability" fget "Drizzle" smatch if
         loc @ { "@battle/" BID @ "/roomweather" }cat "rain dance" setprop
@@ -554,7 +554,7 @@ target @ "ability" fget "turboblaze" smatch or
 target @ "ability" fget "teravolt" smatch or
 { "Mold Breaker" "Turboblaze" "Teravolt" "Unnerve" "Scrappy" "Infiltrator" }list target @ "ability" fget array_findval array_count
 if
-        { "^[o^[c" pos @ "." target @ id_name "^[y has the ability ^[c" target @ "ability" fget cap "^[y!" }cat notify_watchers
+        { "^[o^[c" position @ "." target @ id_name "^[y has the ability ^[c" target @ "ability" fget cap "^[y!" }cat notify_watchers
 then
 
  
@@ -568,7 +568,7 @@ target @ "ability" fget "Intimidate" smatch if
                 temp2 @ "ability" fget "Hyper Cutter" smatch not and
                 temp2 @ "status/statmods/substitute" get not and
                 if
-                { "^[o^[c" pos @ "." target @ id_name "'s ^[yIntimidate cuts ^[c" temp @ "." temp2 @ id_name "'s^[y attack!" }cat notify_watchers
+                { "^[o^[c" position @ "." target @ id_name "'s ^[yIntimidate cuts ^[c" temp @ "." temp2 @ id_name "'s^[y attack!" }cat notify_watchers
                 temp2 @ "status/statmods/PhysAtk" over over atoi 1 - setto
                 then
                 temp2 @ "ability" fget "Defiant" smatch if
@@ -585,12 +585,12 @@ target @ "ability" fget "multitype" smatch if
         target @ "holding" get "*plate" smatch if
                 POKEDEX { "items/" target @ "holding" get "/judgment" }cat getprop temp !
                 target @ "status/statmods/type" temp @ setto
-                { "^[o^[c" pos @ "." target @ id_name "'s ^[ytype is ^[c" temp @ cap "^[y." }cat notify_watchers
+                { "^[o^[c" position @ "." target @ id_name "'s ^[ytype is ^[c" temp @ cap "^[y." }cat notify_watchers
         then
 then
 
 target @ "ability" fget "air lock" smatch if
-        { "^[o^[c" pos @ "." target @ id_name " ^[yhas ^[cAir Lock^[y." }cat notify_watchers
+        { "^[o^[c" position @ "." target @ id_name " ^[yhas ^[cAir Lock^[y." }cat notify_watchers
 then
 
 target @ "ability" fget "cloud nine" smatch if
@@ -619,14 +619,14 @@ then
 target @ "ability" fget "slow start" smatch if
         target @ "status/statmods/ability/slow start" get not if
         target @ "status/statmods/ability/slow start" 1 setto
-        { "^[o^[c" pos @ "." target @ id_name "^[y is having a ^[cSlow Start^[y."}cat notify_watchers
+        { "^[o^[c" position @ "." target @ id_name "^[y is having a ^[cSlow Start^[y."}cat notify_watchers
         then
 then
  
 target @ "ability" fget "Frisk" smatch if
         loc @ { "@battle/" BID @ "/position/" { oteam @ "1" }cat }cat getprop dup if "holding" get temp ! else 0 temp ! then
         loc @ { "@battle/" BID @ "/position/" { oteam @ "2" }cat }cat getprop dup if "holding" get temp2 ! else 0 temp2 ! then
-         { "^[o^[c" pos @ "." target @ id_name "^[y used its ability ^[cFrisk^[y and found that an opponent is carrying ^[c"
+         { "^[o^[c" position @ "." target @ id_name "^[y used its ability ^[cFrisk^[y and found that an opponent is carrying ^[c"
         temp @ temp2 @ and if
  
                 random 2 % if
@@ -663,7 +663,7 @@ target @ "ability" fget "Anticipation" smatch if
                                 temp5 @ temp3 @ array_findval array_count if
                                 "OHKO found!" "Debug" pretty notify_watchers
                                 temp3 @ attack_type movetype !
-                                pos @ typetotalcalculate if
+                                position @ typetotalcalculate if
                                 temp3 @ temp4 !
                                 
                                 break
@@ -674,7 +674,7 @@ target @ "ability" fget "Anticipation" smatch if
                                 temp4 @ not if
                                         temp2 @ "movesknown" fgetvals foreach pop cap temp3 !
                                                 temp3 @ attack_type movetype !
-                                                pos @ typetotalcalculate 1 - if
+                                                position @ typetotalcalculate 1 - if
                                                 POKEDEX { "moves/" temp3 @ "/power" }cat getprop atoi not if continue then
                                                 temp3 @ temp4 !
                                                 break
@@ -688,7 +688,7 @@ target @ "ability" fget "Anticipation" smatch if
                 repeat
  
                 temp4 @ if
-                { "^[o^[c" pos @ "." target @ id_name "^[y realizes that one of its opponents has a dangerous move!" }cat notify_watchers
+                { "^[o^[c" position @ "." target @ id_name "^[y realizes that one of its opponents has a dangerous move!" }cat notify_watchers
                 then
         then
  
@@ -713,7 +713,7 @@ target @ "ability" fget "Forewarn" smatch if
                         loc @ { "@battle/" BID @ "/Forewarn/power" }cat temp4 @ setprop
                         loc @ { "@battle/" BID @ "/Forewarn/move" }cat temp3 @ setprop
                         loc @ { "@battle/" BID @ "/Forewarn/target" }cat temp2 @ setprop
-                        loc @ { "@battle/" BID @ "/Forewarn/pos" }cat temp @ setprop
+                        loc @ { "@battle/" BID @ "/Forewarn/position" }cat temp @ setprop
                         then
  
                 repeat
@@ -721,7 +721,7 @@ target @ "ability" fget "Forewarn" smatch if
         repeat
  
         loc @ { "@battle/" BID @ "/Forewarn/power" }cat getprop if
-                { "^[o^[c" pos @ "." target @ id_name "^[y used its ability ^[cForewarn^[y and learned that ^[c" loc @ { "@battle/" BID @ "/Forewarn/pos" }cat getprop "." loc @ { "@battle/" BID @ "/Forewarn/target" }cat getprop id_name "'s^[y strongest move is ^[c" loc @ { "@battle/" BID @ "/Forewarn/move" }cat getprop "^[y."  }cat notify_watchers
+                { "^[o^[c" position @ "." target @ id_name "^[y used its ability ^[cForewarn^[y and learned that ^[c" loc @ { "@battle/" BID @ "/Forewarn/position" }cat getprop "." loc @ { "@battle/" BID @ "/Forewarn/target" }cat getprop id_name "'s^[y strongest move is ^[c" loc @ { "@battle/" BID @ "/Forewarn/move" }cat getprop "^[y."  }cat notify_watchers
         then
 then
 
@@ -755,7 +755,7 @@ target @ "ability" fget "Trace" smatch if
         repeat
 then
  
-bid @ check_weather "none" smatch not if
+BID @ check_weather "none" smatch not if
         { "A1" "A2" "A3" "B1" "B2" "B3" }list foreach swap pop temp !
         loc @ { "@battle/" BID @ "/position/" temp @ }cat getprop temp2 !
         temp2 @ if
@@ -765,11 +765,11 @@ bid @ check_weather "none" smatch not if
 then
 ; PUBLIC placed_abilities
 
-$libdef illusion (id, bid, team -> return id)
+$libdef illusion (id, BID, team -> return id)
 : illusion
 (for illusion, save curpoke as temp and overwrite it with the illusion, replace during the status bits)
 var! team
-var! bid
+var! BID
 var! curpoke
 var temp2
 var temp3
@@ -793,24 +793,24 @@ curpoke @
 
 ; PUBLIC illusion
  
-$libdef switch_handler (pos, bid, target)
+$libdef switch_handler (position, BID, target)
 : switch_handler
   var! target
   BID !
-  pos !
+  position !
   var beforepoke
  
   loc @ { "@battle/" BID @ "/needtoswitch" }cat remove_prop
-  loc @ { "@battle/" BID @ "/Begin Position/" pos @ }cat getprop beforepoke !
-  loc @ { "@battle/" BID @ "/position/" pos @ }cat target @ setprop
+  loc @ { "@battle/" BID @ "/Begin Position/" position @ }cat getprop beforepoke !
+  loc @ { "@battle/" BID @ "/position/" position @ }cat target @ setprop
   beforepoke @ "battle/position" "" setto
-  target @ "battle/position" pos @ setto
-  target @ bid @ pos @ 1 1 midstr illusion target !
- { "^[o^[c" pos @ "." target @ id_name " ^[yis changing places with ^[c" pos @ "." beforepoke @ id_name "^[y!" }cat notify_watchers
-  loc @ { "@battle/" BID @ "/position/" pos @ }cat getprop target !
-  loc @ { "@battle/" BID @ "/Begin Position/" pos @ }cat target @ setprop
+  target @ "battle/position" position @ setto
+  target @ BID @ position @ 1 1 midstr illusion target !
+ { "^[o^[c" position @ "." target @ id_name " ^[yis changing places with ^[c" position @ "." beforepoke @ id_name "^[y!" }cat notify_watchers
+  loc @ { "@battle/" BID @ "/position/" position @ }cat getprop target !
+  loc @ { "@battle/" BID @ "/Begin Position/" position @ }cat target @ setprop
   var oppteam
-  pos @ "A*" smatch if
+  position @ "A*" smatch if
    "B" oppteam !
   else
    "A" oppteam !
@@ -823,9 +823,9 @@ $libdef switch_handler (pos, bid, target)
   beforepoke @ "MaxHP" calculate var! maxhp
   beforepoke @ "status/hp" get atoi var! currhp
  
-  loc @ { "@battle/" BID @ "/repeats/" POS @ }cat remove_prop
-  loc @ { "@battle/" BID @ "/uproar/" pos @ }cat remove_prop
-  loc @ { "@battle/" BID @ "/declare/" pos @ }cat remove_prop 
+  loc @ { "@battle/" BID @ "/repeats/" position @ }cat remove_prop
+  loc @ { "@battle/" BID @ "/uproar/" position @ }cat remove_prop
+  loc @ { "@battle/" BID @ "/declare/" position @ }cat remove_prop 
   
   POKESTORE { "@pokemon/" target @ "/@RP/status/statmods" }cat remove_prop
   POKESTORE { "@pokemon/" target @ "/@temp/" }cat remove_prop
@@ -858,26 +858,26 @@ $libdef switch_handler (pos, bid, target)
   loc @ { "@battle/" BID @ "/position/" oppteam @ "2" }cat getprop if
   loc @ { "@battle/" BID @ "/Battled/Team" oppteam @ "/" loc @ { "@battle/" BID @ "/Position/" oppteam @ "2" }cat getprop "/" target @ }cat 1 setprop
   then
-  loc @ { "@battle/" BID @ "/lasthit/" pos @ }cat remove_prop
-  loc @ { "@battle/" BID @ "/charge/" pos @ }cat remove_prop
+  loc @ { "@battle/" BID @ "/lasthit/" position @ }cat remove_prop
+  loc @ { "@battle/" BID @ "/charge/" position @ }cat remove_prop
 
 (switch activated abilities)
-pos @ bid @ placed_abilities
+position @ BID @ placed_abilities
 
  
 (do spikes now)
  
-  loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr }cat propdir?
+  loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr }cat propdir?
         if
         target @ "maxhp" calculate maxhp !
         
-        loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr "/spikes" }cat propdir? if
-        loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr "/spikes/count" }cat getprop temp2 !
+        loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr "/spikes" }cat propdir? if
+        loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr "/spikes/count" }cat getprop temp2 !
         (cluster for flying)
            target @ typelist "flying" array_findval array_count if 1 else 0 then
            target @ "ability" fget "levitate" smatch or
                 loc @ { "@battle/"BID @ "/gravity" }cat getprop
-                who @ "holding" get stringify "iron ball" smatch or not and not
+                defender @ "holding" get stringify "iron ball" smatch or not and not
                 target @ "ability" fget "Magic Guard" smatch not and
            (end cluster) if
                 temp2 @ 1  = if target @ "status/hp" over over get atoi maxhp @ 8 target @ "pvp/hpboost" fget dup if atoi * else pop then / - setto then
@@ -886,10 +886,10 @@ pos @ bid @ placed_abilities
                 { "^[o^[c" target @ id_name "^[y took damage from spikes!" }cat notify_watchers
         then then
  
-        loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr "/toxicspikes" }cat propdir? if
+        loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr "/toxicspikes" }cat propdir? if
  
            target @ check_status not
-           target @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and if 0 else 1 then
+           target @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and if 0 else 1 then
            target @ "status/fainted"   get not and
            startsub @ not and          
            target @ typelist "steel" array_findval array_count if 0 else 1 then and
@@ -898,7 +898,7 @@ pos @ bid @ placed_abilities
            target @ typelist "flying" array_findval array_count if 1 else 0 then
            target @ "ability" fget "levitate" smatch or
                 loc @ { "@battle/"BID @ "/gravity" }cat getprop
-                who @ "holding" get stringify "iron ball" smatch or not and not
+                defender @ "holding" get stringify "iron ball" smatch or not and not
            (end cluster)
            and
            if
@@ -907,11 +907,11 @@ pos @ bid @ placed_abilities
                       { "^[o^[c" target @ id_name "^[y is a poison type! The Toxic Spikes are removed!" }cat notify_watchers
                       else
            
-loc @ { "@battle/" BID @ "/shields/" pos @ 1 1 midstr "/safeguard" }cat getprop if { "^[o^[c" target @ id_name "^[y was safeguarded from the effect of the Toxic Spikes!" }cat notify_watchers
+loc @ { "@battle/" BID @ "/shields/" position @ 1 1 midstr "/safeguard" }cat getprop if { "^[o^[c" target @ id_name "^[y was safeguarded from the effect of the Toxic Spikes!" }cat notify_watchers
  
            else
                 target @ "ability" fget "immunity" smatch not if
-                loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr "/toxicspikes/count" }cat getprop temp2 !
+                loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr "/toxicspikes/count" }cat getprop temp2 !
  
                 temp2 @ 1  = if target @ "status/poisoned" 1 setto
                 { "^[o^[c" target @ id_name "^[y is now ^[mpoisoned ^[yfrom the toxic spikes!" }cat notify_watchers
@@ -925,7 +925,7 @@ loc @ { "@battle/" BID @ "/shields/" pos @ 1 1 midstr "/safeguard" }cat getprop 
            then
         then
  
-        loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr "/stealthrock" }cat propdir? 
+        loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr "/stealthrock" }cat propdir? 
         target @ "ability" fget "Magic Guard" smatch not and
         if
                 1
@@ -954,14 +954,14 @@ loc @ { "@battle/" BID @ "/shields/" pos @ 1 1 midstr "/safeguard" }cat getprop 
   then
  
  target @ "status/fainted" get if
- { "^[o^[c" pos @ cap "." target @ id_name " ^[yFainted!!" }cat notify_watchers
+ { "^[o^[c" position @ cap "." target @ id_name " ^[yFainted!!" }cat notify_watchers
  then
 (end spikes)
  
 (healing wish)
 target @ "status/fainted" get not
-loc @ { "@battle/" BID @ "/HealingWish/" pos @ }cat getprop and if
-        loc @ { "@battle/" BID @ "/HealingWish/" pos @ }cat remove_prop
+loc @ { "@battle/" BID @ "/HealingWish/" position @ }cat getprop and if
+        loc @ { "@battle/" BID @ "/HealingWish/" position @ }cat remove_prop
         POKESTORE { "@pokemon/" target @ "/@RP/status" }cat remove_prop
         target @ "status/hp" target @ "maxhp" calculate target @ "pvp/hpboost" fget dup if atoi / else pop then setto
         { "^[o^[c" target @ id_name "^[y was healed by Healing Wish!" }cat notify_watchers
@@ -969,8 +969,8 @@ then
  
 (lunar dance)
 target @ "status/fainted" get not
-loc @ { "@battle/" BID @ "/LunarDance/" pos @ }cat getprop and if
-        loc @ { "@battle/" BID @ "/LunarDance/" pos @ }cat remove_prop
+loc @ { "@battle/" BID @ "/LunarDance/" position @ }cat getprop and if
+        loc @ { "@battle/" BID @ "/LunarDance/" position @ }cat remove_prop
         POKESTORE { "@pokemon/" target @ "/@RP/status" }cat remove_prop
         target @ "status/hp" target @ "maxhp" calculate target @ "pvp/hpboost" fget dup if atoi / else pop then setto
         target @ "movesknown" fgetvals foreach pop move !
@@ -983,22 +983,22 @@ then
 
   
 (update recycle prop)
-loc @ { "@battle/" BID @ "/recycle/" pos @ }cat target @ "holding" get setprop
+loc @ { "@battle/" BID @ "/recycle/" position @ }cat target @ "holding" get setprop
 ; PUBLIC switch_handler
  
 : forceswitch ( s - )
-    var! pos
-    pos @ 1 1 midstr var! team
+    var! position
+    position @ 1 1 midstr var! team
  
-    { loc @ { "@battle/" bid @ "/teams/" team @ }cat array_get_propvals foreach swap pop repeat }list
+    { loc @ { "@battle/" BID @ "/teams/" team @ }cat array_get_propvals foreach swap pop repeat }list
     var! choices
     ( choices is the list of pokes on your team )
  
     {
-    loc @ { "@battle/" bid @ "/position/" team @ "1" }cat getprop dup not if pop then
-    loc @ { "@battle/" bid @ "/position/" team @ "2" }cat getprop dup not if pop then
+    loc @ { "@battle/" BID @ "/position/" team @ "1" }cat getprop dup not if pop then
+    loc @ { "@battle/" BID @ "/position/" team @ "2" }cat getprop dup not if pop then
     }list choices @ array_diff choices !
-    ( choices is now the list of pokes on your team who aren't on the field )
+    ( choices is now the list of pokes on your team defender aren't on the field )
  
     {
     var pokeID
@@ -1010,7 +1010,7 @@ loc @ { "@battle/" BID @ "/recycle/" pos @ }cat target @ "holding" get setprop
       then
     repeat
     }list choices !
-    ( choices is now the list of pokes on your team who aren't on the field and are not fainted and not eggs)
+    ( choices is now the list of pokes on your team defender aren't on the field and are not fainted and not eggs)
  
     choices @ array_count not if
       ( If there are no legal targets to swap to, do something to the effect of 'You suck, it didn't work!' )
@@ -1018,7 +1018,7 @@ loc @ { "@battle/" BID @ "/recycle/" pos @ }cat target @ "holding" get setprop
       exit
     then
  
-    pos @ bid @
+    position @ BID @
       choices @ random choices @ array_count % array_getitem
     switch_handler
  
@@ -1026,9 +1026,9 @@ loc @ { "@battle/" BID @ "/recycle/" pos @ }cat target @ "holding" get setprop
  
  
 $libdef moveswitch
-: moveswitch ( AI/player, bid, user position)
+: moveswitch ( AI/player, BID, user position)
  
-var! pos
+var! position
 BID !
 var! user
 var controller
@@ -1041,11 +1041,11 @@ var trainer1
 var trainer2
 user @ "AI" smatch not if
  
-        bid @ pos @ switch_check pop
-        pos @ 1 1 midstr var! team
-        loc @ { "@battle/" BID @ "/begin position/" pos @ }cat getprop switchid !
+        BID @ position @ switch_check pop
+        position @ 1 1 midstr var! team
+        loc @ { "@battle/" BID @ "/begin position/" position @ }cat getprop switchid !
         switchid @ not if
-        loc @ { "@battle/" BID @ "/position/" pos @ }cat getprop switchid !
+        loc @ { "@battle/" BID @ "/position/" position @ }cat getprop switchid !
         then
         loc @ { "@battle/" BID @ "/control/team" team @ "/" switchid @ }cat getprop controller !
           var counter
@@ -1064,7 +1064,7 @@ user @ "AI" smatch not if
           var othercont
           controller @ { "^[y^[oSwitching for ^[c" switchid @ id_name }cat notify
           controller @ { "^[y^[o------------------------------------------------------------------------" }cat notify
-          bid @ pos @ switch_check pop
+          BID @ position @ switch_check pop
           1 loc @ { "@battle/" BID @ "/teams/" team @ "/" }cat array_get_propvals  array_count 1 for id !
  
           id @ fusionnudge @ - id !
@@ -1170,18 +1170,18 @@ user @ "AI" smatch not if
            controller @ "^[o^[rYou can't switch with that pokemon at this time" "Battle" pretty notify
            continue then
  
-                Pos @ BID @ cid @ switch_handler
+                position @ BID @ cid @ switch_handler
                break
                repeat
                else
                (for AI)
                loc @ { "@battle/" BID @ "/AItype" }cat getprop "wild" smatch if
-                pos @ forceswitch  (wilds arn't smart about how they switch, so leave it like this)
+                position @ forceswitch  (wilds arn't smart about how they switch, so leave it like this)
  
                 else
  
-                pos @ BID @
-                pos @ BID @ AI_switch
+                position @ BID @
+                position @ BID @ AI_switch
                 switch_handler
  
                then
@@ -1192,80 +1192,80 @@ user @ "AI" smatch not if
  
 $libdef batonpass
 : batonpass
-var! pos
-bid !
+var! position
+BID !
 var! user
 var caster
-loc @ { "@battle/" BID @ "/Position/" pos @ }cat getprop caster !
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ }cat remove_prop
+loc @ { "@battle/" BID @ "/Position/" position @ }cat getprop caster !
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ }cat remove_prop
  
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/PhysAtk" }cat caster @ "status/statmods/PhysAtk" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/PhysDef" }cat caster @ "status/statmods/PhysDef" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/SpecAtk" }cat caster @ "status/statmods/SpecAtk" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/SpecDef" }cat caster @ "status/statmods/SpecDef" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/Speed" }cat caster @ "status/statmods/Speed" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/substitute" }cat caster @ "status/statmods/substitute" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/block/move" }cat caster @ "status/statmods/block/move" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/block/user" }cat caster @ "status/statmods/block/user" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/block/userposition" }cat caster @ "status/statmods/block/userposition" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/healovertime/move" }cat caster @ "status/statmods/healovertime/move" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/ingrain/move" }cat caster @ "status/statmods/ingrain/move" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/confused" }cat caster @ "status/statmods/confused" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/A1/user" }cat  caster @ "status/statmods/lock-on/A1/user" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/A1/count" }cat caster @ "status/statmods/lock-on/A1/count" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/A2/user" }cat caster @ "status/statmods/lock-on/A2/user" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/A2/count" }cat caster @ "status/statmods/lock-on/A2/count" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/B1/user" }cat caster @ "status/statmods/lock-on/B1/user" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/B1/count" }cat caster @ "status/statmods/lock-on/B1/count" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/B2/user" }cat caster @ "status/statmods/lock-on/B2/user" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/B2/count" }cat caster @ "status/statmods/lock-on/B2/count" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/embargo" }cat caster @ "status/statmods/embargo" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/abilityremoved" }cat caster @ "status/statmods/abilityremoved" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/perishsong" }cat caster @ "status/statmods/perishsong" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/freehit/caster" }cat caster @ "status/statmods/freehit/caster" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/freehit/count" }cat caster @ "status/statmods/freehit/count" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/accuracy" }cat caster @ "status/statmods/accuracy" get setprop
-                loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/evasion" }cat caster @ "status/statmods/evasion" get setprop
-                user @ bid @ pos @ moveswitch
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/PhysAtk" }cat caster @ "status/statmods/PhysAtk" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/PhysDef" }cat caster @ "status/statmods/PhysDef" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/SpecAtk" }cat caster @ "status/statmods/SpecAtk" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/SpecDef" }cat caster @ "status/statmods/SpecDef" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/Speed" }cat caster @ "status/statmods/Speed" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/substitute" }cat caster @ "status/statmods/substitute" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/block/move" }cat caster @ "status/statmods/block/move" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/block/user" }cat caster @ "status/statmods/block/user" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/block/userposition" }cat caster @ "status/statmods/block/userposition" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/healovertime/move" }cat caster @ "status/statmods/healovertime/move" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/ingrain/move" }cat caster @ "status/statmods/ingrain/move" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/confused" }cat caster @ "status/statmods/confused" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/A1/user" }cat  caster @ "status/statmods/lock-on/A1/user" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/A1/count" }cat caster @ "status/statmods/lock-on/A1/count" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/A2/user" }cat caster @ "status/statmods/lock-on/A2/user" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/A2/count" }cat caster @ "status/statmods/lock-on/A2/count" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/B1/user" }cat caster @ "status/statmods/lock-on/B1/user" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/B1/count" }cat caster @ "status/statmods/lock-on/B1/count" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/B2/user" }cat caster @ "status/statmods/lock-on/B2/user" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/B2/count" }cat caster @ "status/statmods/lock-on/B2/count" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/embargo" }cat caster @ "status/statmods/embargo" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/abilityremoved" }cat caster @ "status/statmods/abilityremoved" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/perishsong" }cat caster @ "status/statmods/perishsong" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/freehit/caster" }cat caster @ "status/statmods/freehit/caster" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/freehit/count" }cat caster @ "status/statmods/freehit/count" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/accuracy" }cat caster @ "status/statmods/accuracy" get setprop
+                loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/evasion" }cat caster @ "status/statmods/evasion" get setprop
+                user @ BID @ position @ moveswitch
                 (now copy over all the effects)
                 var afterswitch
-                loc @ { "@battle/" BID @ "/position/" pos @ }cat getprop afterswitch !
-                afterswitch @ "status/statmods/PhysAtk" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/PhysAtk" }cat getprop setto
-                afterswitch @ "status/statmods/PhysDef" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/PhysDef" }cat getprop setto
-                afterswitch @ "status/statmods/SpecAtk" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/SpecAtk" }cat getprop setto
-                afterswitch @ "status/statmods/SpecDef" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/SpecDef" }cat getprop setto
-                afterswitch @ "status/statmods/Speed" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/Speed" }cat getprop setto
-                afterswitch @ "status/statmods/substitute" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/substitute" }cat getprop setto
-                afterswitch @ "status/statmods/block/move" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/block/move" }cat getprop setto
-                afterswitch @ "status/statmods/block/user" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/block/user" }cat getprop setto
-                afterswitch @ "status/statmods/block/userposition" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/block/userposition" }cat getprop setto
-                afterswitch @ "status/statmods/healovertime/move" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/healovertime/move" }cat getprop setto
-                afterswitch @ "status/statmods/ingrain/move" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/ingrain/move" }cat getprop setto
-                afterswitch @ "status/statmods/confused" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/confused" }cat getprop setto
-                afterswitch @ "status/statmods/lock-on/A1/user"  loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/A1/user" }cat getprop setto
-                afterswitch @ "status/statmods/lock-on/A1/count" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/A1/count" }cat getprop setto
-                afterswitch @ "status/statmods/lock-on/A2/user"  loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/A2/user" }cat getprop setto
-                afterswitch @ "status/statmods/lock-on/A2/count" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/A2/count" }cat getprop setto
-                afterswitch @ "status/statmods/lock-on/B1/user"  loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/B1/user" }cat getprop setto
-                afterswitch @ "status/statmods/lock-on/B1/count" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/B1/count" }cat getprop setto
-                afterswitch @ "status/statmods/lock-on/B2/user"  loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/B2/user" }cat getprop setto
-                afterswitch @ "status/statmods/lock-on/B2/count" loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/lock-on/B2/count" }cat getprop setto
-                afterswitch @ "status/statmods/embargo"          loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/embargo" }cat getprop setto
-                afterswitch @ "status/statmods/abilityremoved"   loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/abilityremoved" }cat getprop setto
-                afterswitch @ "status/statmods/perishsong"       loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/perishsong" }cat getprop setto
-                afterswitch @ "status/statmods/freehit/caster"   loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/freehit/caster" }cat getprop setto
-                afterswitch @ "status/statmods/freehit/count"    loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/freehit/count" }cat getprop setto
-                afterswitch @ "status/statmods/accuracy"         loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/accuracy"}cat getprop setto
-                afterswitch @ "status/statmods/evasion"          loc @ { "@battle/" BID @ "/temp/pass/" pos @ "/status/statmods/evasion"}cat getprop setto
+                loc @ { "@battle/" BID @ "/position/" position @ }cat getprop afterswitch !
+                afterswitch @ "status/statmods/PhysAtk" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/PhysAtk" }cat getprop setto
+                afterswitch @ "status/statmods/PhysDef" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/PhysDef" }cat getprop setto
+                afterswitch @ "status/statmods/SpecAtk" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/SpecAtk" }cat getprop setto
+                afterswitch @ "status/statmods/SpecDef" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/SpecDef" }cat getprop setto
+                afterswitch @ "status/statmods/Speed" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/Speed" }cat getprop setto
+                afterswitch @ "status/statmods/substitute" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/substitute" }cat getprop setto
+                afterswitch @ "status/statmods/block/move" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/block/move" }cat getprop setto
+                afterswitch @ "status/statmods/block/user" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/block/user" }cat getprop setto
+                afterswitch @ "status/statmods/block/userposition" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/block/userposition" }cat getprop setto
+                afterswitch @ "status/statmods/healovertime/move" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/healovertime/move" }cat getprop setto
+                afterswitch @ "status/statmods/ingrain/move" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/ingrain/move" }cat getprop setto
+                afterswitch @ "status/statmods/confused" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/confused" }cat getprop setto
+                afterswitch @ "status/statmods/lock-on/A1/user"  loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/A1/user" }cat getprop setto
+                afterswitch @ "status/statmods/lock-on/A1/count" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/A1/count" }cat getprop setto
+                afterswitch @ "status/statmods/lock-on/A2/user"  loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/A2/user" }cat getprop setto
+                afterswitch @ "status/statmods/lock-on/A2/count" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/A2/count" }cat getprop setto
+                afterswitch @ "status/statmods/lock-on/B1/user"  loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/B1/user" }cat getprop setto
+                afterswitch @ "status/statmods/lock-on/B1/count" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/B1/count" }cat getprop setto
+                afterswitch @ "status/statmods/lock-on/B2/user"  loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/B2/user" }cat getprop setto
+                afterswitch @ "status/statmods/lock-on/B2/count" loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/lock-on/B2/count" }cat getprop setto
+                afterswitch @ "status/statmods/embargo"          loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/embargo" }cat getprop setto
+                afterswitch @ "status/statmods/abilityremoved"   loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/abilityremoved" }cat getprop setto
+                afterswitch @ "status/statmods/perishsong"       loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/perishsong" }cat getprop setto
+                afterswitch @ "status/statmods/freehit/caster"   loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/freehit/caster" }cat getprop setto
+                afterswitch @ "status/statmods/freehit/count"    loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/freehit/count" }cat getprop setto
+                afterswitch @ "status/statmods/accuracy"         loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/accuracy"}cat getprop setto
+                afterswitch @ "status/statmods/evasion"          loc @ { "@battle/" BID @ "/temp/pass/" position @ "/status/statmods/evasion"}cat getprop setto
                 afterswitch @ "status/statmods/abilityremoved" get if
                 POKESTORE { "@pokemon/" afterswitch @ fid "/@temp/ability" }Cat "Disabled" setprop
                 then
 ; PUBLIC batonpass
 
-: findrank (search the speed ranks and find the rank of the POS)
+: findrank (search the speed ranks and find the rank of the position)
 var! posid
 var counter
-1 loc @ { "@battle/" bid @ "/speed/rank/" }cat array_get_propvals array_count 1 for counter !
+1 loc @ { "@battle/" BID @ "/speed/rank/" }cat array_get_propvals array_count 1 for counter !
         loc @ { "@battle/" BID @ "/speed/rank/" counter @ }cat getprop posid @ smatch if break then
 repeat
 counter @
@@ -1277,19 +1277,19 @@ var! newindex
 var! oldindex
 
 
-loc @ { "@battle/" bid @ "/speed/rank/" oldindex @ }cat getprop var! olddata
+loc @ { "@battle/" BID @ "/speed/rank/" oldindex @ }cat getprop var! olddata
 
 1 var! count
 var data
 var index
-loc @ { "@battle/" bid @ "/speed/rank/"}cat array_get_propvals foreach data ! atoi index ! 
+loc @ { "@battle/" BID @ "/speed/rank/"}cat array_get_propvals foreach data ! atoi index ! 
         index @ oldindex @ = if continue then
         
         index @ newindex @ = if 
-        loc @ { "@battle/" bid @ "/speed/rank/" count @ }cat olddata @ setprop
+        loc @ { "@battle/" BID @ "/speed/rank/" count @ }cat olddata @ setprop
         count ++
         then
-        loc @ { "@battle/" bid @ "/speed/rank/" count @ }cat data @ setprop
+        loc @ { "@battle/" BID @ "/speed/rank/" count @ }cat data @ setprop
         count ++
 repeat
 ; 
@@ -1302,19 +1302,19 @@ var dam
 
 move @ "beat up" smatch if
 
-        loc @ { "@battle/" BID @ "/temp/beatup/" pos @  1 1 midstr "/" turncount @ }cat getprop
+        loc @ { "@battle/" BID @ "/temp/beatup/" position @  1 1 midstr "/" turncount @ }cat getprop
 
 exit
 then
 
 move @ "round" smatch if
-        loc @ { "@battle/" BID @ "/temp/round_boost/" pos @ }cat getprop if basepower @ 2 * basepower ! then
+        loc @ { "@battle/" BID @ "/temp/round_boost/" position @ }cat getprop if basepower @ 2 * basepower ! then
         basepower @
 exit
 then
 
 move @ "Electro Ball" smatch if
-        who @ "speed" calculate temp !
+        defender @ "speed" calculate temp !
         attacker @ "speed" calculate temp2 !
         temp2 @ temp @ 1.0 * / temp3 !
         
@@ -1332,8 +1332,8 @@ move @ "Electro Ball" smatch if
 then
 
 move @ "Venoshock" smatch if
-        who @ "status/posioned" get 
-        who @ "status/tocix" get or if
+        defender @ "status/posioned" get 
+        defender @ "status/tocix" get or if
         130
         else
         65
@@ -1353,7 +1353,7 @@ exit
 then
 
 move @ "low kick" smatch move @ "grass knot" smatch or if
- who @ weightcalc var! weight
+ defender @ weightcalc var! weight
  
  weight @ 22.0 <= if
  20 exit then
@@ -1369,7 +1369,7 @@ move @ "low kick" smatch move @ "grass knot" smatch or if
 then
 
 move @ "Heat Crash" smatch move @ "Heavy Slam" smatch or if
-        who @ weightcalc temp !
+        defender @ weightcalc temp !
         attacker @ weightcalc temp2 !
         temp2 @ temp @ 1.0 * / temp3 !
         
@@ -1400,7 +1400,7 @@ exit
 then
  
 move @ "assurance" smatch if
- loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" tpos @ }cat getprop if
+ loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" temp_position @ }cat getprop if
  100
  exit
  else
@@ -1410,7 +1410,7 @@ move @ "assurance" smatch if
 then
 
 move @ "Retaliate" smatch if
-loc @ { "@battle/" BID @ "/faint turns/" pos @ 1 1 midstr "/" loc @ { "@battle/" BID @ "/turn" }cat getprop 1 - }cat getprop if
+loc @ { "@battle/" BID @ "/faint turns/" position @ 1 1 midstr "/" loc @ { "@battle/" BID @ "/turn" }cat getprop 1 - }cat getprop if
 140
 else
 70
@@ -1428,8 +1428,8 @@ exit
 then
  
 move @ "payback" smatch if
-loc @ { "@Battle/" BID @ "/declare/finished/" tpos @ }cat getprop 
-        loc @ { "@battle/" BID @ "/declare/" tpos @ }cat getprop dup not if pop " " then "item*" smatch not and
+loc @ { "@Battle/" BID @ "/declare/finished/" temp_position @ }cat getprop 
+        loc @ { "@battle/" BID @ "/declare/" temp_position @ }cat getprop dup not if pop " " then "item*" smatch not and
         if
 100
 else
@@ -1441,7 +1441,7 @@ then
 move @ "avalanche" smatch
 move @ "revenge" smatch or
 if
- loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" pos @ }cat getprop if
+ loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" position @ }cat getprop if
  120
  exit
  else
@@ -1476,41 +1476,41 @@ move @ "solarbeam" smatch if
 then
  
 move @ "wring out" smatch if
-        who @ "status/hp" get atoi who @ "maxhp" calculate 1.0 * / 120 * floor basepower !
+        defender @ "status/hp" get atoi defender @ "maxhp" calculate 1.0 * / 120 * floor basepower !
         basepower @ not if 1 exit else basepower @ exit then
 then
  
 move @ "gyro ball" smatch if
-        who @ "Speed" calculate temp !
-        POKEDEX { "items/" who @ "holding" get "/halfSpeed" }cat getprop if
+        defender @ "Speed" calculate temp !
+        POKEDEX { "items/" defender @ "holding" get "/halfSpeed" }cat getprop if
         temp @ 2 / temp !
         then
-        who @ "ability" fget "slow start" smatch if
-                who @ "status/statmods/ability/slow start" get atoi  5 > not if
+        defender @ "ability" fget "slow start" smatch if
+                defender @ "status/statmods/ability/slow start" get atoi  5 > not if
                 temp @ 0.5 * floor temp !
                 then
         then
  
-        who @ "ability" fget "quick feet" smatch
-        who @ check_status and if
+        defender @ "ability" fget "quick feet" smatch
+        defender @ check_status and if
         temp @ 1.5 * floor temp !
         ( temp @ 999 > if 999 temp ! then )
         then
  
-        who @ "ability" fget "unburden" smatch
-        who @ "holding" get "nothing" smatch and
-        who @ "Ability" fget "Chlorophyll" smatch
-        bid @ check_weather "sunny day" smatch and or
-        who @ "Ability" fget "Swift Swim" smatch
-        bid @ check_weather "rain dance" smatch and or
-        who @ "ability" fget "Sand Rush" smatch
-        bid @ check_weather "sandstorm" smatch and or
+        defender @ "ability" fget "unburden" smatch
+        defender @ "holding" get "nothing" smatch and
+        defender @ "Ability" fget "Chlorophyll" smatch
+        BID @ check_weather "sunny day" smatch and or
+        defender @ "Ability" fget "Swift Swim" smatch
+        BID @ check_weather "rain dance" smatch and or
+        defender @ "ability" fget "Sand Rush" smatch
+        BID @ check_weather "sandstorm" smatch and or
         if
         temp @ 2 * temp !
         ( temp @ 999 > if 999 temp ! then )
  
         then
-        loc @ { "@battle/" BID @ "/tailwind/" tpos @ 1 1 midstr }cat getprop if
+        loc @ { "@battle/" BID @ "/tailwind/" temp_position @ 1 1 midstr }cat getprop if
         temp @ 2 * temp !
         ( temp @ 999 > if 999 temp ! then )
         then
@@ -1537,15 +1537,15 @@ move @ "gyro ball" smatch if
         attacker @ "Ability" fget "unburden" smatch
         attacker @ "holding" get "nothing" smatch and
         attacker @ "Ability" fget "Chlorophyll" smatch
-        bid @ check_weather "sunny day" smatch and or
+        BID @ check_weather "sunny day" smatch and or
         attacker @ "ability" fget "swift swim" smatch
-        bid @ check_weather "rain dance" smatch and or
+        BID @ check_weather "rain dance" smatch and or
         if
         temp2 @ 2 * temp2 !
         ( temp2 @ 999 > if 999 temp2 ! then )
  
         then
-        loc @ { "@battle/" BID @ "/tailwind/" pos @ 1 1 midstr }cat getprop if
+        loc @ { "@battle/" BID @ "/tailwind/" position @ 1 1 midstr }cat getprop if
         temp2 @ 2 * temp2 !
         ( temp2 @ 999 > if 999 temp2 ! then)
         then
@@ -1559,7 +1559,7 @@ move @ "hidden power" smatch if
 60
 (Old way down here)
 (
- who @ "hiddenpowerbasepower" get dup if exit else pop then
+ defender @ "hiddenpowerbasepower" get dup if exit else pop then
  var ivs
  
  attacker @ "IVs" get ivs !
@@ -1576,15 +1576,15 @@ move @ "hidden power" smatch if
 then
  
 move @ "brine" smatch if
- who @ "MaxHP"   Calculate var! maxhp
- who @ "status/hp" get atoi var! hp
+ defender @ "MaxHP"   Calculate var! maxhp
+ defender @ "status/hp" get atoi var! hp
  hp @ maxhp @ 2 / <= if
  130 exit else 65 exit then
 then
  
 move @ "crush grip" smatch if
- who @ "MaxHP"   Calculate var! maxhp
- who @ "status/hp" get atoi var! hp
+ defender @ "MaxHP"   Calculate var! maxhp
+ defender @ "status/hp" get atoi var! hp
  120.0 hp @ * maxhp @ / floor 1 +
  exit
 then
@@ -1607,7 +1607,7 @@ move @ "facade" smatch if
 then
  
 move @ "wake-up slap" smatch if
-who @ "status/asleep" get if
+defender @ "status/asleep" get if
         120 exit
         else
         60
@@ -1616,7 +1616,7 @@ who @ "status/asleep" get if
 then
  
 move @ "SmellingSalt" smatch if
-who @ "status/paralyzed" get if
+defender @ "status/paralyzed" get if
         120 exit
         else
         60
@@ -1669,10 +1669,10 @@ move @ "return" smatch if
 then
  
 move @ "pursuit" smatch if
- loc @ { "@battle/" bid @ "/declare/" TPOS @ }cat getprop if
- loc @ { "@battle/" bid @ "/declare/" TPOS @ }cat getprop " " split pop "switch" smatch if
+ loc @ { "@battle/" BID @ "/declare/" temp_position @ }cat getprop if
+ loc @ { "@battle/" BID @ "/declare/" temp_position @ }cat getprop " " split pop "switch" smatch if
  80
- loc @ { "@battle/" bid @ "/pursuit/" pos @ }cat tpos @ setprop
+ loc @ { "@battle/" BID @ "/pursuit/" position @ }cat temp_position @ setprop
  exit else 40 exit then
  else
  40 exit then
@@ -1691,15 +1691,15 @@ move @ "fury cutter" smatch if
 then
 
 move @ "Hex" smatch if
-who @ check_status if 100 else 50 then
+defender @ check_status if 100 else 50 then
 exit 
 then
 
 move @ "Fusion Bolt" smatch if
-loc @ { "@battle/" BID @ "/tempvalues/Fusion Bolt/" pos @ 1 1 midstr "/last use" }cat loc @ { "@battle/" BID @ "/turn" }cat getprop setprop
-loc @ { "@battle/" BID @ "/tempvalues/Fusion Flare/" pos @ 1 1 midstr "/last use" }cat getprop if
+loc @ { "@battle/" BID @ "/tempvalues/Fusion Bolt/" position @ 1 1 midstr "/last use" }cat loc @ { "@battle/" BID @ "/turn" }cat getprop setprop
+loc @ { "@battle/" BID @ "/tempvalues/Fusion Flare/" position @ 1 1 midstr "/last use" }cat getprop if
         loc @ { "@battle/" BID @ "/turn" }cat getprop 
-        loc @ { "@battle/" BID @ "/tempvalues/Fusion Flare/" pos @ 1 1 midstr "/last use" }cat getprop
+        loc @ { "@battle/" BID @ "/tempvalues/Fusion Flare/" position @ 1 1 midstr "/last use" }cat getprop
         = if
         200
         else
@@ -1713,10 +1713,10 @@ exit
 then
 
 move @ "Fusion Flare" smatch if
-loc @ { "@battle/" BID @ "/tempvalues/Fusion Flare/" pos @ 1 1 midstr "/last use" }cat loc @ { "@battle/" BID @ "/turn" }cat getprop setprop
-loc @ { "@battle/" BID @ "/tempvalues/Fusion Bolt/" pos @ 1 1 midstr "/last use" }cat getprop if
+loc @ { "@battle/" BID @ "/tempvalues/Fusion Flare/" position @ 1 1 midstr "/last use" }cat loc @ { "@battle/" BID @ "/turn" }cat getprop setprop
+loc @ { "@battle/" BID @ "/tempvalues/Fusion Bolt/" position @ 1 1 midstr "/last use" }cat getprop if
         loc @ { "@battle/" BID @ "/turn" }cat getprop 
-        loc @ { "@battle/" BID @ "/tempvalues/Fusion Bolt/" pos @ 1 1 midstr "/last use" }cat getprop
+        loc @ { "@battle/" BID @ "/tempvalues/Fusion Bolt/" position @ 1 1 midstr "/last use" }cat getprop
         = if
         200
         else
@@ -1730,17 +1730,17 @@ exit
 then
 
 move @ "Echoed voice" smatch if
-loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" pos @ 1 1 midstr "/last use" }cat getprop if
+loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" position @ 1 1 midstr "/last use" }cat getprop if
         loc @ { "@battle/" BID @ "/turn" }cat getprop 
-        loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" pos @ 1 1 midstr "/last use" }cat getprop
-        - 1 > if 1 else loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" pos @ 1 1 midstr "/uses" }cat getprop then
+        loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" position @ 1 1 midstr "/last use" }cat getprop
+        - 1 > if 1 else loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" position @ 1 1 midstr "/uses" }cat getprop then
 else
-loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" pos @ 1 1 midstr }cat remove_prop
+loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" position @ 1 1 midstr }cat remove_prop
 1
 then
  40 * temp !
- loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" pos @ 1 1 midstr "/last use" }cat loc @ { "@battle/" BID @ "/turn" }cat getprop setprop
- loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" pos @ 1 1 midstr "/uses" }cat over over getprop 1 + setprop
+ loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" position @ 1 1 midstr "/last use" }cat loc @ { "@battle/" BID @ "/turn" }cat getprop setprop
+ loc @ { "@battle/" BID @ "/tempvalues/Echoed Voice/" position @ 1 1 midstr "/uses" }cat over over getprop 1 + setprop
  temp @ 200 > if 200 temp ! then temp @
 exit
 then
@@ -1773,11 +1773,11 @@ then
  
 move @ "Magnitude" smatch if
 var randomval
-        loc @ { "@battle/" BID @ "/tempvalues/storedtemp/" pos @ "/magnitude" }cat getprop not if
+        loc @ { "@battle/" BID @ "/tempvalues/storedtemp/" position @ "/magnitude" }cat getprop not if
         frand randomval !
-        loc @ { "@battle/" BID @ "/tempvalues/storedtemp/" pos @ "/magnitude" }cat randomval @ setprop
+        loc @ { "@battle/" BID @ "/tempvalues/storedtemp/" position @ "/magnitude" }cat randomval @ setprop
         else
-        loc @ { "@battle/" BID @ "/tempvalues/storedtemp/" pos @ "/magnitude" }cat getprop randomval !
+        loc @ { "@battle/" BID @ "/tempvalues/storedtemp/" position @ "/magnitude" }cat getprop randomval !
         then
         randomval @  0.05 <= if  { "^[y^[oMagnitude 4!" }cat notify_watchers 10 exit then
         randomval @  0.15 <= if  { "^[y^[oMagnitude 5!" }cat notify_watchers 30 exit then
@@ -1801,7 +1801,7 @@ then
 move @ "punishment" smatch if
         0 temp2 !
         { "PhysAtk" "PhysDef" "SpecAtk" "SpecDef" "Speed" }list foreach swap pop temp !
-        who @ { "status/statmods/" temp @ }cat get atoi dup 0 > if temp2 @ + temp2 ! else pop then
+        defender @ { "status/statmods/" temp @ }cat get atoi dup 0 > if temp2 @ + temp2 ! else pop then
         repeat
         basepower @ temp2 @ 20 * + basepower !
         basepower @ 200 > if 200 basepower ! then
@@ -1810,7 +1810,7 @@ exit
 then
  
 move @ "natural gift" smatch if
-        pos @ attacker @ can_use_hold_item
+        position @ attacker @ can_use_hold_item
         if
                 -1 (-1 is fail) exit then
                 
@@ -1840,7 +1840,7 @@ basepower @ (use this if it never changes)
  
 $libdef confusion_damage
 : confusion_damage
-cap pos ! BID ! attacker !
+cap position ! BID ! attacker !
  
 attacker @ user !
 var beforestockpile
@@ -1868,7 +1868,7 @@ then
                         then
         then
         
-        pos @ "Flower Gift" bid @ team_ability if
+        position @ "Flower Gift" BID @ team_ability if
                 attack @ 1.5 * floor attack !
                 then
  
@@ -1900,13 +1900,13 @@ user @ Defstat @ Calculate defense !
                 then
         then
         else
-                tpos @ "Flower Gift" bid @ team_ability
+                temp_position @ "Flower Gift" BID @ team_ability
                 user @ moldbreaker
                 if
                         defense @ 1.5 * floor defense !
                 then
-                who @ typelist "rock" array_findval array_count
-                        bid @ check_weather "sandstorm" smatch and
+                defender @ typelist "rock" array_findval array_count
+                        BID @ check_weather "sandstorm" smatch and
                         if
                                 defense @ 1.5 * floor defense !
         then
@@ -1926,7 +1926,7 @@ loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod t
 tempref @ awake? not if continue then
 tempref @ location loc @ = not if continue then
  
-tempref @ { "^[o^[c" pos @ "." attacker @ id_name "^[y hurt itself in its confusion!" }cat notify repeat
+tempref @ { "^[o^[c" position @ "." attacker @ id_name "^[y hurt itself in its confusion!" }cat notify repeat
  
 user @ "status/statmods/substitute" get if
 damage @ substitute_damage
@@ -1936,10 +1936,10 @@ user @ "status/hp" get atoi 0 <= if
 POKESTORE { "@pokemon/" user @ "/@RP/status" }cat remove_prop
 user @ "status/hp" 0 setto
 user @ "status/fainted" 1 setto
- { "^[o^[c" pos @ cap "." user @ id_name " ^[yFainted!!" }cat bid @ notify_watchers
+ { "^[o^[c" position @ cap "." user @ id_name " ^[yFainted!!" }cat BID @ notify_watchers
                                     user @ "happiness" over over fget atoi 1 - fsetto
                 user @ "happiness" over over fget atoi 0 < if 0 fsetto else pop pop then
-loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" pos @ }cat 1 setprop
+loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" position @ }cat 1 setprop
 then then
  
  
@@ -1973,13 +1973,13 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
      pop
      (do percentage abilities)
      user @ "ability" fget "Serene Grace" smatch
-     loc @ { "@battle/" BID @ "/pledge field/" pos @ 1 1 midstr "/move" }cat getprop dup if "water pledge" smatch or else pop then
+     loc @ { "@battle/" BID @ "/pledge field/" position @ 1 1 midstr "/move" }cat getprop dup if "water pledge" smatch or else pop then
      POKEDEX { "moves/" move @ "/power" }cat getprop atoi and
      if
      percent @ 2 * percent ! then
  
      targettype @ "self" smatch not
-     who @ "ability" fget "Shield Dust" smatch
+     defender @ "ability" fget "Shield Dust" smatch
      POKEDEX { "moves/" move @ "/power" }cat getprop atoi and and
      user @ moldbreaker
      if
@@ -1996,27 +1996,27 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
      targettype @ "self" smatch if
      user @ target !
      user @ caster !
-     pos @ position !
-     tpos @ tposition !
-     pos @ 1 1 midstr positionteam !
+     position @ position !
+     temp_position @ tposition !
+     position @ 1 1 midstr positionteam !
      else
  
-     who @ target !
+     defender @ target !
      user @ caster !
-     tpos @ position !
-     pos @ tposition !
-     tpos @ 1 1 midstr positionteam !
+     temp_position @ position !
+     position @ tposition !
+     temp_position @ 1 1 midstr positionteam !
  then
      (check for snatch)
      POKEDEX { "moves/" move @ "/snatch?" }cat getprop loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/caster" }cat getprop and if
      loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/snatched" }cat getprop not
-     loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/snatched" }cat getprop stringify pos @ smatch or if
-     loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/pos" }cat getprop temp !
+     loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/snatched" }cat getprop stringify position @ smatch or if
+     loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/position" }cat getprop temp !
      loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/caster" }cat getprop temp2 !
      loc @ { "@battle/" BID @ "/position/" temp @ }cat getprop stringify temp2 @ stringify smatch if
      loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/snatched" }cat getprop not if
      { "^[o^[c" temp @ "." temp2 @ id_name "^[y snatched the move!" }cat notify_watchers
-     loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/snatched" }cat pos @ setprop
+     loc @ { "@battle/" BID @ "/snatch/" positionteam @ "/snatched" }cat position @ setprop
      then
  
      temp2 @ target !
@@ -2030,17 +2030,17 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
      then
      then
         (do magic coat)
-        loc @ { "@battle/" bid @ "/magic coat/" tpos @ }cat getprop 
-        who @ "ability" fget "Magic bounce" smatch 
+        loc @ { "@battle/" BID @ "/magic coat/" temp_position @ }cat getprop 
+        defender @ "ability" fget "Magic bounce" smatch 
         caster @ moldbreaker 
         or
         POKEDEX { "moves/" move @ "/reflectable" }cat getprop and
         if
-                who @ caster !
+                defender @ caster !
                 user @ target !
-                pos @ position !
-                pos @ 1 1 midstr positionteam !
-                who @ "ability" fget "Magic Bounce" smatch if
+                position @ position !
+                position @ 1 1 midstr positionteam !
+                defender @ "ability" fget "Magic Bounce" smatch if
                 "^[o^[cMagic Bounce^[y reflected the effect!" notify_watchers
                 else
                 "^[o^[cMagic Coat^[y reflected the effect!" notify_watchers
@@ -2059,7 +2059,7 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
  
  then
         (sheer force)
-        targettype @ "self" smatch not who @ "ability" fget "Sheer Force"  smatch and POKEDEX { "move/" move @ "/power" }cat getprop and if continue then
+        targettype @ "self" smatch not defender @ "ability" fget "Sheer Force"  smatch and POKEDEX { "move/" move @ "/power" }cat getprop and if continue then
 
         effect @ "secretpower" smatch if
                 loc @ "@locationtype" getprop temp !
@@ -2167,7 +2167,7 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
         "^[o^[yBut it failed..." notify_watchers
         exit
         then
-        loc @ { "@battle/" bid @ "/recycle/" pos @ }cat getprop temp !
+        loc @ { "@battle/" BID @ "/recycle/" position @ }cat getprop temp !
         temp @ not if "Nothing" temp ! then
         temp @ "Nothing" smatch if
         "^[o^[yBut it failed..." notify_watchers
@@ -2223,7 +2223,7 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
  
                 caster @ { "status/statmods/mimic/move" }cat get not if
  
-                        loc @ { "@battle/" BID @ "/position/" loc @ { "@battle/" BID @ "/declare/" pos @ "/target" }cat getprop }cat getprop "status/statmods/MoveContinued/MoveName" get temp !
+                        loc @ { "@battle/" BID @ "/position/" loc @ { "@battle/" BID @ "/declare/" position @ "/target" }cat getprop }cat getprop "status/statmods/MoveContinued/MoveName" get temp !
                         temp @ not if
                         "^[o^[yBut it failed..." notify_watchers
                         continue
@@ -2313,7 +2313,7 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
         else
                 POKESTORE { "@pokemon/" caster @ fid "/@temp/ability" }cat temp @ setprop
                 { "^[o^[c" caster @ id_name "^[y copied ^[c" target @ id_name "'s^[y abilitiy ^[c" temp @ cap "^[y!" }cat notify_watchers
-                pos @ bid @ placed_abilities
+                position @ BID @ placed_abilities
         then
         continue
         then
@@ -2331,8 +2331,8 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
                 POKESTORE { "@pokemon/" target @ fid "/@long/ability" }cat temp2 @ setprop
                 POKESTORE { "@pokemon/" caster @ fid "/@long/ability" }cat temp @ setprop
                 { "^[o^[c" caster @ id_name "^[y and ^[c" target @ id_name "^[y have had its abilities ^[c" temp2 @ cap "^[y and ^[c" temp @ cap " swapped!" }cat notify_watchers
-                position @ bid @ placed_abilities
-                tposition @ bid @ placed_abilities
+                position @ BID @ placed_abilities
+                tposition @ BID @ placed_abilities
         then
         continue
         then
@@ -2348,7 +2348,7 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
         effect @ "snatch" smatch if
                 position @ "A*" smatch if "B" else "A" then temp !
                 loc @ { "@battle/" BID @ "/snatch/" temp @ "/caster" }cat caster @ setprop
-                loc @ { "@battle/" BID @ "/snatch/" temp @ "/pos" }cat position @ setprop
+                loc @ { "@battle/" BID @ "/snatch/" temp @ "/position" }cat position @ setprop
                 { "^[o^[c" caster @ id_name "^[y waits for a target to make a move!" }cat notify_watchers
         continue
         then
@@ -2372,17 +2372,17 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
         then
  
         effect @ "rapidspin" smatch if
-                loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr }cat propdir? if
-                loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr "/spikes" }cat propdir? if
+                loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr }cat propdir? if
+                loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr "/spikes" }cat propdir? if
                         { "^[o^[c" caster @ id_name "^[y removed the ^[cspikes^[y from its side!" }cat notify_watchers
                 then
-                loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr "/toxicspikes" }cat propdir? if
+                loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr "/toxicspikes" }cat propdir? if
                         { "^[o^[c" caster @ id_name "^[y removed the ^[ctoxic spikes^[y from its side!" }cat notify_watchers
                 then
-                loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr "/stealthrock" }cat propdir? if
+                loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr "/stealthrock" }cat propdir? if
                         { "^[o^[c" caster @ id_name "^[y removed the ^[cstealth rock^[y from its side!" }cat notify_watchers
                 then
-                loc @ { "@battle/" BID @ "/spikes/" pos @ 1 1 midstr }cat remove_prop
+                loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr }cat remove_prop
                 then
  
                 caster @ "status/statmods/vortex/turns" get if
@@ -2436,7 +2436,7 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
                 loc @ { "@battle/" BID @ "/spikes/" position @ 1 1 midstr }cat remove_prop
                 loc @ { "@battle/" BID @ "/shields/" position @ 1 1 midstr }cat remove_prop
                 { "^[o^[cTeam " position @ 1 1 midstr " ^[yhas had its field cheared. All shields and spikes are removed!" }cat notify_watchers
-                bid @ check_weather "fog" smatch if
+                BID @ check_weather "fog" smatch if
                 { "^[o^[yThe fog had cleared!" }cat notify_watchers
                 loc @ { "@battle/" BID @ "/roomweather" }cat remove_prop
                 then
@@ -2446,7 +2446,7 @@ POKEDEX { "moves/" move @ "/effects" }cat getprop if  (if there is an effect pro
         effect @ "block" smatch if
                 target @ "status/statmods/block/move" move @ setto
                 target @ "status/statmods/block/user" caster @ setto
-                target @ "status/statmods/block/userposition" pos @ setto
+                target @ "status/statmods/block/userposition" position @ setto
                 { "^[o^[c" target @ id_name "^[y is now blocked!" }cat notify_watchers
                 continue
         then
@@ -2508,7 +2508,7 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
                         then
  
                         effect @ "move first" smatch if
-                                 { "^[o^[c" target @ id_name "^[y is attacking sooner next turn!" }cat bid @ notify_watchers
+                                 { "^[o^[c" target @ id_name "^[y is attacking sooner next turn!" }cat BID @ notify_watchers
                                  target @ "status/statmods/movefirst" 1 setto
                                  continue
                         then
@@ -2694,7 +2694,7 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
                 then
                 target @ "status/statmods/vortex/turns" hittimes @ setto
                 target @ "status/statmods/vortex/holder" caster @ setto
-                target @ "status/statmods/vortex/holderposition" pos @ setto
+                target @ "status/statmods/vortex/holderposition" position @ setto
                 target @ "status/statmods/vortex/move" move @ setto
                 { "^[o^[c" caster @ id_name "^[y has ^[c" target @ id_name "^[y trapped!" }cat notify_watchers
                 continue
@@ -2714,13 +2714,13 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
                 (min - stored as a string, this is the minimum number of turns a move will happen - needed)
                 (max - stored as a string, this is the maximum number of turns a move will happen - needed)
                 (EndingEffect - stored as a string, this is what the effect changes to - optional)
-                loc @ { "@battle/" BID @ "/repeats/" pos @ }cat propdir? not if
+                loc @ { "@battle/" BID @ "/repeats/" position @ }cat propdir? not if
  
-                        loc @ { "@battle/" BID @ "/repeats/" pos @ "/move" }cat move @ setprop
+                        loc @ { "@battle/" BID @ "/repeats/" position @ "/move" }cat move @ setprop
                         POKEDEX {  "moves/" move @ "/repeats/max" }cat getprop atoi max !
                         POKEDEX {  "moves/" move @ "/repeats/min" }cat getprop atoi min !
                         random max @ min @ - 1 + % min @ +  var! turns (don't subtract one for this turn)
-                        loc @ { "@battle/" BID @ "/repeats/" pos @ "/turns" }cat turns @ setprop
+                        loc @ { "@battle/" BID @ "/repeats/" position @ "/turns" }cat turns @ setprop
  
                         continue
  
@@ -2763,7 +2763,7 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
         then
  
         effect @ "uproar" smatch if
-                loc @ { "@battle/" BID @ "/uproar/" pos @ }cat caster @ setprop
+                loc @ { "@battle/" BID @ "/uproar/" position @ }cat caster @ setprop
                 (next remove the sleeping status of any pokemon that is sleeping)
                 var temppos
                 var temptarget
@@ -2826,7 +2826,7 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
            target @ "status/toxic"     get if continue then
            target @ "status/burned"    get if continue then
            target @ "status/fainted"   get if continue then
-           target @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
+           target @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
            startsub @ target @ caster @ smatch not and if ({ "^[o^[c" position @ "." target @ id_name "'s^[y substitute protected it from the attack's effect!" }cat notify_watchers) continue then
            random 3 % 1 + effect !
            effect @ 1 = if target @ "ability" fget "water veil" smatch if continue then target @ typelist "fire" array_findval array_count
@@ -2842,7 +2842,7 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
        then
  
        effect @ "faintafter" smatch if
-       loc @ { "@battle/" BID @ "/FaintAfterTurn/" pos @ }cat "yes" setprop
+       loc @ { "@battle/" BID @ "/FaintAfterTurn/" position @ }cat "yes" setprop
        then
  
        effect @ "randomstat*" smatch if
@@ -2877,8 +2877,8 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
  
  
        effect @ "hurtnear" smatch if
-        pos @ "A*" smatch if "A" temp ! (tpos) else "B" temp ! then
-        pos @ "?1" smatch pos @ "?3" smatch if
+        position @ "A*" smatch if "A" temp ! (temp_position) else "B" temp ! then
+        position @ "?1" smatch position @ "?3" smatch if
         { { temp @ "2" }cat }list temp3 !
                 
         else
@@ -2917,12 +2917,12 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
        then
        
        effect @ "moveswitch" smatch if
-                bid @ pos @ switch_check not if continue then
-                loc @ { "@battle/" BID @ "/control/team" pos @ 1 1 midstr "/" caster @ }cat getprop DBref? if
-                loc @ { "@battle/" BID @ "/pause" }cat pos @ setprop
-                loc @ { "@battle/" BID @ "/control/team" pos @ 1 1 midstr "/" caster @ }cat getprop "@battle/moveswitch" pos @ setprop
+                BID @ position @ switch_check not if continue then
+                loc @ { "@battle/" BID @ "/control/team" position @ 1 1 midstr "/" caster @ }cat getprop DBref? if
+                loc @ { "@battle/" BID @ "/pause" }cat position @ setprop
+                loc @ { "@battle/" BID @ "/control/team" position @ 1 1 midstr "/" caster @ }cat getprop "@battle/moveswitch" position @ setprop
                 else
-                loc @ { "@battle/" BID @ "/moveswitch/" pos @ }cat 1 setprop
+                loc @ { "@battle/" BID @ "/moveswitch/" position @ }cat 1 setprop
                 then
                 continue
        then
@@ -2972,7 +2972,7 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
            target @ "status/toxic"     get if continue then
            target @ "status/burned"    get if continue then
            target @ "status/fainted"   get if continue then
-           target @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and targettype @ "target" smatch and if continue then
+           target @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and targettype @ "target" smatch and if continue then
            startsub @ target @ caster @ smatch not and if ({ "^[o^[c" position @ "." target @ id_name "'s^[y substitute protected it from the attack's effect!" }cat notify_watchers) continue then
            loc @ { "@battle/" BID @ "/uproar" }cat propdir? if
            { "^[o^[c" target @ id_name "^[y would have fallen ^[bAsleep^[y but couldn't due to the effect of uproar!" }cat notify_watchers continue then
@@ -2987,7 +2987,7 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
            random 5 % 2 + then
            user @ "ability" fget "early bird" smatch if dup 2 / - then
            setto
-     loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+     loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
      tempref @ awake? not if continue then
      tempref @ location loc @ = not if continue then
  
@@ -3092,17 +3092,17 @@ POKEDEX { "items/" temp @ "/holdeffect" }cat getprop berryeffect !
   target @ "status/toxic"     get if continue then
   target @ "status/burned"    get if continue then
   target @ "status/fainted"   get if continue then
-  target @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
+  target @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
   target @ "ability" fget "water veil" smatch caster @ moldbreaker if continue then
   startsub @ target @ caster @ smatch not and if ({ "^[o^[c" position @ "." target @ id_name "'s^[y substitute protected it from the attack's effect!" }cat notify_watchers) continue then
   target @ typelist "fire" array_findval array_count if
   target @ "ability" fget "flash fire" smatch target @ "status/statmods/damageboost/fire" get not and if
           target @ "status/statmods/damageboost/fire" 1 setto
-          { "^[o^[c" tpos @ "." target @ id_name "'s^[y ability ^[cFlash Fire^[y has been activated!"  }cat notify_watchers
+          { "^[o^[c" temp_position @ "." target @ id_name "'s^[y ability ^[cFlash Fire^[y has been activated!"  }cat notify_watchers
         then
   continue then
   target @ "status/burned"    1 setto
-loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
 tempref @ awake? not if continue then
 tempref @ location loc @ = not if continue then
  
@@ -3142,7 +3142,7 @@ continue
               else
               pop
               then
-                loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+                loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
                 tempref @ awake? not if continue then
   tempref @ location loc @ = not if continue then
   temp @ 1 = if
@@ -3166,7 +3166,7 @@ continue
        
        effect @ "quash" smatch if
                 caster @ findrank target @ findrank < if "^[o^[yBut it failed..." notify_watchers continue then
-                target @ findrank loc @ { "@battle/" bid @ "/speed/rank/" }cat array_get_propvals array_count rankchange
+                target @ findrank loc @ { "@battle/" BID @ "/speed/rank/" }cat array_get_propvals array_count rankchange
                 
                 { "^[o^[c" target @ id_name "^[y must now go last!" }cat notify_watchers
        continue
@@ -3175,21 +3175,21 @@ continue
        effect @ "allyswitch" smatch if
                 0 temp !
                 { -1 1 }list foreach temp2 !
-                loc @ { "@battle/" BID @ "/position/" pos @ 1 1 midstr pos @ 2 1 midstr atoi temp2 @ + }cat getprop if temp @ 1 + temp ! then
+                loc @ { "@battle/" BID @ "/position/" position @ 1 1 midstr position @ 2 1 midstr atoi temp2 @ + }cat getprop if temp @ 1 + temp ! then
                 repeat
                 
                 temp @ 1 != if "^[o^[yBut it failed..." notify_watchers continue then
                 
                 { -1 1 }list foreach temp2 !
-                loc @ { "@battle/" BID @ "/position/" pos @ 1 1 midstr pos @ 2 1 midstr atoi temp2 @ + }cat getprop if
-                { pos @ 1 1 midstr pos @ 2 1 midstr atoi temp @ + }cat temp3 !
+                loc @ { "@battle/" BID @ "/position/" position @ 1 1 midstr position @ 2 1 midstr atoi temp2 @ + }cat getprop if
+                { position @ 1 1 midstr position @ 2 1 midstr atoi temp @ + }cat temp3 !
                 break
                 then
                 repeat
                 
-                loc @ { "@battle/" BID @ "/position/" pos @ }cat getprop temp !
+                loc @ { "@battle/" BID @ "/position/" position @ }cat getprop temp !
                 loc @ { "@battle/" BID @ "/position/" temp3 @ }cat getprop temp2 !
-                loc @ { "@battle/" BID @ "/position/" pos @ }cat temp2 @ setprop
+                loc @ { "@battle/" BID @ "/position/" position @ }cat temp2 @ setprop
                 loc @ { "@battle/" BID @ "/position/" temp3 @ }cat temp @ setprop
                 
                 { "^[o^[c" caster @ id_name "^[y traded places with its partner!" }cat notify_watchers
@@ -3263,7 +3263,7 @@ continue
            target @ "MaxHP"   Calculate var! curemaxhp
  
            (use this to modify the cure ammount for weather based changes)
-        bid @ check_weather weather !
+        BID @ check_weather weather !
         weather @ if
            weather @ "Rain Dance" smatch
            weather @ "hail" smatch or
@@ -3326,7 +3326,7 @@ continue
        temp @ 6 > if 6 temp ! then
        temp @ -6 < if -6 temp ! then
        temp @ setto
-       loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+       loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
  tempref @ awake? not if continue then
  tempref @ location loc @ = not if continue then
          tempref @ {
@@ -3413,7 +3413,7 @@ continue
         then
  
        effect @ "frozen" smatch if
-   bid @ check_weather weather !
+   BID @ check_weather weather !
    weather @ "sunny day" smatch if continue then
    loc @ { "@battle/" BID @ "/shields/" positionteam @ "/safeguard" }cat getprop targettype @ "target" smatch user @ "ability" fget "Infiltrator" smatch not and and if { "^[o^[c" target @ id_name "^[y was safeguarded from the effect of the attack!" }cat notify_watchers continue then
    target @ "status/frozen"    get if continue then
@@ -3424,11 +3424,11 @@ continue
    target @ "status/burned"    get if continue then
    target @ "status/fainted"   get if continue then
    target @ "ability" fget "magma armor" smatch caster @ moldbreaker if continue then
-   target @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
+   target @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
    startsub @ target @ caster @ smatch not and if ({ "^[o^[c" position @ "." target @ id_name "'s^[y substitute protected it from the attack's effect!" }cat notify_watchers) continue then
           target @ typelist "ice" array_findval array_count not if
           target @ "status/Frozen" 1 setto
-     loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+     loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
      tempref @ awake? not if continue then
      tempref @ location loc @ = not if continue then
  
@@ -3445,7 +3445,7 @@ continue
             effect @ " " "PhysAtk" subst strip atoi effect !
             target @ "ability" fget "contrary" smatch caster @ moldbreaker if effect @ -1 * effect ! then
             target @ "ability" fget "simple" smatch caster @ moldbreaker if effect @ 2 * effect ! then
-            POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if bid @ check_weather smatch if effect @ 2 * effect ! then else pop then
+            POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if BID @ check_weather smatch if effect @ 2 * effect ! then else pop then
                    effect @ 0 < if
                    target @ "ability" fget "Clear Body" smatch target @ "ability" fget "White smoke" smatch or target @ "ability" fget "hyper cutter" smatch or targettype @ "self" smatch not and
                    caster @ moldbreaker
@@ -3458,7 +3458,7 @@ continue
             temp @ 6 > if 6 temp ! then
             temp @ -6 < if -6 temp ! then
             temp @ setto
-            loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+            loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
             tempref @ awake? not if continue then
      tempref @ location loc @ = not if continue then
               tempref @ {
@@ -3493,7 +3493,7 @@ continue
                    effect @ " " "PhysDef" subst strip atoi effect !
                    target @ "ability" fget "simple" smatch caster @ moldbreaker if effect @ 2 * effect ! then
                    target @ "ability" fget "contrary" smatch caster @ moldbreaker if effect @ -1 * effect ! then
-                   POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if bid @ check_weather smatch if effect @ 2 * effect ! then else pop then
+                   POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if BID @ check_weather smatch if effect @ 2 * effect ! then else pop then
                        effect @ 0 < if
                            target @ "ability" fget "Clear Body" smatch target @ "ability" fget "White smoke" smatch or targettype @ "self" smatch not and
                            target @ "ability" fget "Big Pecks" smatch targettype @ "self" smatch not and or
@@ -3507,7 +3507,7 @@ continue
                    temp @ 6 > if 6 temp ! then
                    temp @ -6 < if -6 temp ! then
                    temp @ setto
-                   loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+                   loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
                    tempref @ awake? not if continue then
      tempref @ location loc @ = not if continue then
  
@@ -3543,7 +3543,7 @@ continue
                           effect @ " " "SpecAtk" subst strip atoi effect !
                           target @ "ability" fget "simple" smatch caster @ moldbreaker if effect @ 2 * effect ! then
                           target @ "ability" fget "contrary" smatch caster @ moldbreaker if effect @ -1 * effect ! then
-                          POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if bid @ check_weather smatch if effect @ 2 * effect ! then else pop then
+                          POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if BID @ check_weather smatch if effect @ 2 * effect ! then else pop then
                        effect @ 0 < if
                            target @ "ability" fget "Clear Body" smatch target @ "ability" fget "White smoke" smatch or targettype @ "self" smatch not and
                            caster @ moldbreaker
@@ -3556,7 +3556,7 @@ continue
                           temp @ 6 > if 6 temp ! then
                           temp @ -6 < if -6 temp ! then
                           temp @ setto
-                          loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+                          loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
                           tempref @ awake? not if continue then
      tempref @ location loc @ = not if continue then
  
@@ -3591,7 +3591,7 @@ continue
                          effect @ " " "SpecDef" subst strip atoi effect !
                          target @ "ability" fget "simple" smatch caster @ moldbreaker if effect @ 2 * effect ! then
                          target @ "ability" fget "contrary" smatch caster @ moldbreaker if effect @ -1 * effect ! then
-                         POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if bid @ check_weather smatch if effect @ 2 * effect ! then else pop then
+                         POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if BID @ check_weather smatch if effect @ 2 * effect ! then else pop then
                        effect @ 0 < if
                            target @ "ability" fget "Clear Body" smatch target @ "ability" fget "White smoke" smatch or targettype @ "self" smatch not and
                            caster @ moldbreaker
@@ -3604,7 +3604,7 @@ continue
                                  temp @ 6 > if 6 temp ! then
                                  temp @ -6 < if -6 temp ! then
                                  temp @ setto
-                                 loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+                                 loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
                                  tempref @ awake? not if continue then
      tempref @ location loc @ = not if continue then
  
@@ -3640,7 +3640,7 @@ continue
                       effect @ " " "Speed" subst strip atoi effect !
                       target @ "ability" fget "simple" smatch caster @ moldbreaker if effect @ 2 * effect ! then
                       target @ "ability" fget "contrary" smatch caster @ moldbreaker if effect @ -1 * effect ! then
-                      POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if bid @ check_weather smatch if effect @ 2 * effect ! then else pop then
+                      POKEDEX { "moves/" move @ "/weatherboost" }cat getprop dup if BID @ check_weather smatch if effect @ 2 * effect ! then else pop then
                        effect @ 0 < if
                            target @ "ability" fget "Clear Body" smatch target @ "ability" fget "White smoke" smatch or targettype @ "self" smatch not and
                            caster @ moldbreaker
@@ -3653,7 +3653,7 @@ continue
                                       temp @ 6 > if 6 temp ! then
                                       temp @ -6 < if -6 temp ! then
                                       temp @ setto
-                                      loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+                                      loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
                                       tempref @ awake? not if continue then
           tempref @ location loc @ = not if continue then
                                         tempref @ {
@@ -3746,7 +3746,7 @@ continue
            temp @ "ability" fget "soundproof" smatch
            attacker @ moldbreaker
            if
-           { "^[o^[y But it failed on ^[c"who @ id_name " ^[ybecause they are soundproof..." }Cat notify_watchers
+           { "^[o^[y But it failed on ^[c"defender @ id_name " ^[ybecause they are soundproof..." }Cat notify_watchers
            continue
            then
         then
@@ -3789,7 +3789,7 @@ continue
           continue then
           startsub @ target @ caster @ smatch not and if ({ "^[o^[c" position @ "." target @ id_name "'s^[y substitute protected it from the attack's effect!" }cat notify_watchers) continue then
           target @ "status/statmods/seeded"
-       pos @ setto
+       position @ setto
        { "^[o^[c" target @ id_name "^[y has been seeded!" }cat notify_watchers
        continue
        then
@@ -3802,7 +3802,7 @@ continue
    target @ "status/poisoned"  get if continue then
    target @ "status/toxic"     get if continue then
    target @ "status/burned"    get if continue then
-   target @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
+   target @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
    target @ "status/fainted"   get if continue then
    startsub @ target @ caster @ smatch not and if ({ "^[o^[c" position @ "." target @ id_name "'s^[y substitute protected it from the attack's effect!" }cat notify_watchers) continue then
              target @ typelist "poison" array_findval array_count if continue then
@@ -3811,7 +3811,7 @@ continue
              caster @ moldbreaker
              if continue then
              target @ "status/Toxic" 1 setto
-     loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+     loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
      tempref @ awake? not if continue then
      tempref @ location loc @ = not if continue then
  
@@ -3833,13 +3833,13 @@ continue
    caster @ moldbreaker
    if continue then
    move @ attack_type "electric" smatch  target @ typelist "ground" array_findval array_count and if continue then
-   target @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
+   target @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
    target @ "status/fainted"   get if continue then
    startsub @ target @ caster @ smatch not and if ({ "^[o^[c" position @ "." target @ id_name "'s^[y substitute protected it from the attack's effect!" }cat notify_watchers) continue then
              target @ "status/paralyzed"
           1 setto
  
-     loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+     loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
      tempref @ awake? not if continue then
      tempref @ location loc @ = not if continue then
  
@@ -3857,7 +3857,7 @@ continue
    target @ "status/poisoned"  get if continue then
    target @ "status/toxic"     get if continue then
    target @ "status/burned"    get if continue then
-   target @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
+   target @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and caster @ moldbreaker  if continue then
    target @ "status/fainted"   get if continue then
    startsub @ target @ caster @ smatch not and if ({ "^[o^[c" position @ "." target @ id_name "'s^[y substitute protected it from the attack's effect!" }cat notify_watchers) continue then
              target @ typelist "poison" array_findval array_count if continue then
@@ -3867,7 +3867,7 @@ continue
              if continue then
              target @ "status/Poisoned"
           1 setto
-     loc @ { "@battle/" bid @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
+     loc @ { "@battle/" BID @ "/watching/" }cat array_get_propvals foreach pop stod tempref !
      tempref @ awake? not if continue then
      tempref @ location loc @ = not if continue then
  
@@ -3891,17 +3891,17 @@ continue
  
                  effect @ " " "Weather-" subst strip effect !
                  
-                 effect @ bid @ check_weather smatch if
+                 effect @ BID @ check_weather smatch if
                         "^[o^[yBut it failed..." notify_watchers
                  continue
                  then
-                 loc @ { "@battle/" bid @ "/roomweather" }cat effect @ setprop
+                 loc @ { "@battle/" BID @ "/roomweather" }cat effect @ setprop
                  6 temp !
                  effect @ "rain dance" smatch caster @ "holding" get "Damp Rock" smatch and position @ caster @ can_use_hold_item and if 9 temp ! then
                  effect @ "Hail" smatch caster @ "holding" get "Icy Rock" smatch and position @ caster @ can_use_hold_item and if 9 temp ! then
                  effect @ "sunny day" smatch caster @ "holding" get "Heat Rock" smatch and position @ caster @ can_use_hold_item and if 9 temp ! then
                  effect @ "sandstorm" smatch caster @ "holding" get "Smooth Rock" smatch and position @ caster @ can_use_hold_item and if 9 temp ! then
-                 loc @ { "@battle/" bid @ "/roomweather/length" }cat temp @ setprop
+                 loc @ { "@battle/" BID @ "/roomweather/length" }cat temp @ setprop
                  {
                   effect @ "Hail" smatch if
                   "^[y^[oThe battle is hit with hail."
@@ -3976,22 +3976,22 @@ continue
         then
  
         effect @ "lock-on" smatch if
-                target @ { "status/statmods/lock-on/" pos @ "/user" }cat caster @ setto
-                target @ { "status/statmods/lock-on/" pos @ "/count" }cat 2 setto
+                target @ { "status/statmods/lock-on/" position @ "/user" }cat caster @ setto
+                target @ { "status/statmods/lock-on/" position @ "/count" }cat 2 setto
                 { "^[o^[c" caster @ id_name "^[y is targeting ^[c" target @ id_name }Cat notify_watchers
                 continue
         then
  
         effect @ "batonpass" smatch if
  
-                bid @ pos @ switch_check not if
+                BID @ position @ switch_check not if
                 "^[y^[oBut it failed..." notify_watchers
                 continue then
-                loc @ { "@battle/" BID @ "/control/team" pos @ 1 1 midstr "/" caster @ }cat getprop DBref? if
-                loc @ { "@battle/" BID @ "/pause" }cat pos @ setprop
-                loc @ { "@battle/" BID @ "/control/team" pos @ 1 1 midstr "/" caster @ }cat getprop "@battle/batonpass" pos @ setprop
+                loc @ { "@battle/" BID @ "/control/team" position @ 1 1 midstr "/" caster @ }cat getprop DBref? if
+                loc @ { "@battle/" BID @ "/pause" }cat position @ setprop
+                loc @ { "@battle/" BID @ "/control/team" position @ 1 1 midstr "/" caster @ }cat getprop "@battle/batonpass" position @ setprop
                 else
-                loc @ { "@battle/" BID @ "/batonpass/" pos @ }cat 1 setprop
+                loc @ { "@battle/" BID @ "/batonpass/" position @ }cat 1 setprop
                 then
  
                 continue
@@ -3999,8 +3999,8 @@ continue
  
         (effect @ "beatup" smatch if
  
-                loc @ { "@battle/" BID @ "/beatup/" pos @ }cat getprop if continue then
-                loc @ { "@battle/" bid @ "/beatup/" pos @ }cat "yes" setprop
+                loc @ { "@battle/" BID @ "/beatup/" position @ }cat getprop if continue then
+                loc @ { "@battle/" BID @ "/beatup/" position @ }cat "yes" setprop
  
                 continue
         then)
@@ -4656,7 +4656,7 @@ then
  
 $libdef damage_calc
 : damage_calc
-cap pos ! cap tpos ! BID ! attacker ! who ! move !
+cap position ! cap temp_position ! BID ! attacker ! defender ! move !
 
 (set debug prop)
 #0 "@debug" getprop if 1 debug ! then
@@ -4664,26 +4664,26 @@ cap pos ! cap tpos ! BID ! attacker ! who ! move !
 attacker @ user !
 user @ "status/fainted" get if exit then
  
-who @ check_status majorstatus !
+defender @ check_status majorstatus !
 0 heal !
 0 misshurtself !
 0 noeffect !
 
  
-who @ "status/hp" get atoi who @ "maxhp" calculate = if 1 else 0 then StartedFullHP !
-who @ "status/statmods/substitute" get if 1 else 0 then startsub !
+defender @ "status/hp" get atoi defender @ "maxhp" calculate = if 1 else 0 then StartedFullHP !
+defender @ "status/statmods/substitute" get if 1 else 0 then startsub !
  
 (check if its a target must be sleeping move)
 POKEDEX { "moves/" move @ "/mustasleep" }cat getprop if
-        who @ "status/asleep" get not if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because ^[c" tpos @ "." who @ id_name " ^[yisn't asleep!" }Cat notify_watchers
+        defender @ "status/asleep" get not if
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because ^[c" temp_position @ "." defender @ id_name " ^[yisn't asleep!" }Cat notify_watchers
         exit
         then
 then
 (check if the move has to be used first only)
 POKEDEX { "moves/" move @ "/firstonly" }cat getprop if
         attacker @ "status/statmods/turns-out" get atoi 1 > if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because it isn't its first move!" }Cat notify_watchers
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because it isn't its first move!" }Cat notify_watchers
         exit
         then
 then
@@ -4695,13 +4695,13 @@ move @ "last resort" smatch if
         temp @
         attacker @ "movesknown" fgetvals array_count temp2 !
         temp2 @ 1 = if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because it can't be its only move!" }Cat notify_watchers
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because it can't be its only move!" }Cat notify_watchers
         exit
         then
         temp2 @ 4 > if 4 temp2 ! then
         temp2 @ 1 - temp2 !
         temp2 @ temp @ > if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because it needs to use more moves first!" }Cat notify_watchers
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because it needs to use more moves first!" }Cat notify_watchers
         exit
         then
 then
@@ -4711,51 +4711,51 @@ POKEDEX { "moves/" move @ "/soundproof" }cat getprop if POKEDEX { "moves/" move 
 (for now until a better solution, just check if move has properity of soundbell and ignore its soundproofing here.)
 POKEDEX { "moves/" move @ "/effects" }cat getprop if POKEDEX { "moves/" move @ "/effects" }cat getprop "*healbell*" smatch not if 1 else 0 then else 0 then and
 if
-        who @ "ability" fget "soundproof" smatch
+        defender @ "ability" fget "soundproof" smatch
         attacker @ moldbreaker
         if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because ^[c" tpos @ "." who @ id_name " ^[yis soundproof!" }Cat notify_watchers
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but fails because ^[c" temp_position @ "." defender @ id_name " ^[yis soundproof!" }Cat notify_watchers
         exit
         then
 then
  
 (check for Motor Drive ability)
-who @ "ability" fget "Motor Drive" smatch
+defender @ "ability" fget "Motor Drive" smatch
 attacker @ moldbreaker
 if
-        who @ typelist "ground" array_findval array_count not if
+        defender @ typelist "ground" array_findval array_count not if
                 attacker @ { "moves/" move @ "/type" }cat get "electric" smatch if
-                { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but ^[c" tpos @ "." who @ id_name "^[y absorbs its energy because of its ability ^[c " who @ "ability" fget cap "^[y!" }Cat notify_watchers
-                who @ "status/statmods/Speed" over over get atoi 1 + setto
+                { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but ^[c" temp_position @ "." defender @ id_name "^[y absorbs its energy because of its ability ^[c " defender @ "ability" fget cap "^[y!" }Cat notify_watchers
+                defender @ "status/statmods/Speed" over over get atoi 1 + setto
                 exit
                 then
         then
 then
 1 var! semi-inv-breaker
  (since triple kick is special and has to be accuracy checked 3 times, we put its modification here)
- move @ "triple kick" smatch if 3 tkcount ! -10 tkdamage ! else 1 tkcount ! then
- 1 tkcount @ 1 for pop
- move @ "triple kick" smatch if tkdamage @ 10 + tkdamage ! then
+ move @ "triple kick" smatch if 3 triple_kick_count ! -10 triple_kick_damage ! else 1 triple_kick_count ! then
+ 1 triple_kick_count @ 1 for pop
+ move @ "triple kick" smatch if triple_kick_damage @ 10 + triple_kick_damage ! then
  
  
 (set recharging moves)
-loc @ { "@battle/" BID @ "/charge/" pos @ "/recharge" }cat
+loc @ { "@battle/" BID @ "/charge/" position @ "/recharge" }cat
 POKEDEX { "moves/" move @ "/recharge" }cat getprop atoi
 setprop
 (endrecharging)
 move @ "future attack" smatch not if
 POKEDEX { "moves/" move @ "/target" }cat getprop "self" smatch not if
  (here goes the rod abilities)
- loc @ { "@battle/" BID @ "/followme/" tpos @ 1 1 midstr }cat getprop not if
+ loc @ { "@battle/" BID @ "/followme/" temp_position @ 1 1 midstr }cat getprop not if
    user @ { "moves/" move @ "/type" }cat get movetype !
-   who @ "ability" fget "Storm Drain" smatch
+   defender @ "ability" fget "Storm Drain" smatch
    movetype @ "water" smatch and
-   who @ "ability" fget "Lightningrod" smatch
+   defender @ "ability" fget "Lightningrod" smatch
    movetype @ "electric" smatch and
   or
   user @ moldbreaker
   if
-  { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but it is drawn to ^[c" tpos @ "." who @ id_name "^[y because of its ability ^[c" who @ "ability" fget cap "^[y!" }Cat notify_watchers
+  { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y but it is drawn to ^[c" temp_position @ "." defender @ id_name "^[y because of its ability ^[c" defender @ "ability" fget cap "^[y!" }Cat notify_watchers
   
   
   
@@ -4763,21 +4763,21 @@ POKEDEX { "moves/" move @ "/target" }cat getprop "self" smatch not if
 then
 then
  
-(loc @ { "@battle/" BID @ "/beatup/" pos @ }cat getprop not if)
+(loc @ { "@battle/" BID @ "/beatup/" position @ }cat getprop not if)
  
 move @ "feint" smatch if
-        who @ "status/statmods/protected" get if
-                { "^[o^[c" tpos @ "." who @ id_name "[y fell for the Feint!" }cat notify_watchers
-                who @ "status/statmods/protected" "" setto
+        defender @ "status/statmods/protected" get if
+                { "^[o^[c" temp_position @ "." defender @ id_name "[y fell for the Feint!" }cat notify_watchers
+                defender @ "status/statmods/protected" "" setto
         then
-        tpos @ 1 1 midstr pos @ 1 1 midstr smatch not if
-                loc @ { "@battle/" BID @ "/shields/" tpos @ 1 1 midstr "/" }cat remove_prop
+        temp_position @ 1 1 midstr position @ 1 1 midstr smatch not if
+                loc @ { "@battle/" BID @ "/shields/" temp_position @ 1 1 midstr "/" }cat remove_prop
         then
 then
  
 POKEDEX { "/moves/" move @ "/nothurt" }cat getprop
-loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" pos @ }cat getprop and if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y but it failed!" }Cat notify_watchers
+loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" position @ }cat getprop and if
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y but it failed!" }Cat notify_watchers
 exit
 then
  
@@ -4786,30 +4786,30 @@ move @ "doom desire" smatch or not if
  
  POKEDEX { "moves/" move @  "/accuracy" }cat getprop atoi accuracy !
  user @ "holding" get "wide lens" smatch if accuracy @ 1.10 * floor accuracy ! then 
- move @ "future attack" smatch if  POKEDEX { "moves/" loc @ { "@battle/" BID @ "/future attack/" pos @ "/attack" }cat getprop "/accuracy" }cat getprop atoi accuracy ! then
+ move @ "future attack" smatch if  POKEDEX { "moves/" loc @ { "@battle/" BID @ "/future attack/" position @ "/attack" }cat getprop "/accuracy" }cat getprop atoi accuracy ! then
  
  user @ FindPokeLevel var! level
- who @ findpokelevel var! tarlevel
+ defender @ findpokelevel var! tarlevel
  
  (here is wher we apply the accuracy modifications)
  (OHKO moves have their own rules)
  POKEDEX { "moves/" move @ "/OHKO" }cat getprop dup not if pop "no" then "yes" smatch if
  
-  who @ "status/statmods/protected" get if
+  defender @ "status/statmods/protected" get if
         POKEDEX { "moves/" move @ "/protect?" }cat getprop "yes" smatch if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y but they were protected and unaffected!" }Cat notify_watchers
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y but they were protected and unaffected!" }Cat notify_watchers
         exit
         then
  
   then
- who @ "ability" fget "sturdy" smatch
+ defender @ "ability" fget "sturdy" smatch
  attacker @ moldbreaker
  if
-         { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y but they have the ability ^[c" who @ "ability" fget cap "^[y!" }Cat notify_watchers
+         { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y but they have the ability ^[c" defender @ "ability" fget cap "^[y!" }Cat notify_watchers
          exit
  then
  level @ tarlevel @ < if
- { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y but it failed..." }Cat notify_watchers
+ { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y but it failed..." }Cat notify_watchers
  exit
  else
  level @ tarlevel @ - 30.0 + 100 / accuracy !
@@ -4824,7 +4824,7 @@ move @ "doom desire" smatch or not if
  
  loc @ { "@battle/" BID @ "/gravity" }cat getprop if
         POKEDEX { "moves/" move @ "/gravityfail" }cat getprop if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y but the gravity stopped them!" }Cat notify_watchers
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y but the gravity stopped them!" }Cat notify_watchers
         exit
  then
  then
@@ -4836,31 +4836,31 @@ move @ "doom desire" smatch or not if
           then
         then
  
- 1 who @ "Evasion" move @ "IgnoreStatMods" get if basecalculate else calculate then -
- who @ "ability" fget "Sand veil" smatch bid @ check_weather "sandstorm" smatch and
- who @ "ability" fget "snow cloak" smatch bid @ check_weather "hail" smatch and or
+ 1 defender @ "Evasion" move @ "IgnoreStatMods" get if basecalculate else calculate then -
+ defender @ "ability" fget "Sand veil" smatch BID @ check_weather "sandstorm" smatch and
+ defender @ "ability" fget "snow cloak" smatch BID @ check_weather "hail" smatch and or
  user @ moldbreaker
  if
  1.20 /
  then
  
- who @ "ability" fget "tangled feet" smatch
- who @ "status/statmods/confused" get and 
+ defender @ "ability" fget "tangled feet" smatch
+ defender @ "status/statmods/confused" get and 
  user @ moldbreaker
  if 1.20 /  then
  
   var! WhoEva
  
- who @ "holding" get "brightpowder" smatch tpos @ who @ can_use_hold_item and if WhoEva @ 0.10 - WhoEva ! then
- who @ "holding" get "lax incense" smatch tpos @ who @ can_use_hold_item and if WhoEva @ 0.05 - WhoEva ! then
- who @ "status/statmods/foresight" get WhoEva @ 1.0 < and if
+ defender @ "holding" get "brightpowder" smatch temp_position @ defender @ can_use_hold_item and if WhoEva @ 0.10 - WhoEva ! then
+ defender @ "holding" get "lax incense" smatch temp_position @ defender @ can_use_hold_item and if WhoEva @ 0.05 - WhoEva ! then
+ defender @ "status/statmods/foresight" get WhoEva @ 1.0 < and if
  1.0 WhoEva ! then
  
  
  var moveaccuracy
  accuracy @ moveaccuracy !
  
- bid @ check_weather weather !
+ BID @ check_weather weather !
  
  move @ "blizzard" smatch if
         weather @ "hail" smatch if
@@ -4900,7 +4900,7 @@ move @ "doom desire" smatch or not if
  accuracy @ 1.67 * accuracy !
  then
  
- bid @ check_weather "fog" smatch if
+ BID @ check_weather "fog" smatch if
  accuracy @ 0.9 * accuracy !
  then
  
@@ -4915,18 +4915,18 @@ move @ "doom desire" smatch or not if
  then
 
  
- who @ "status/statmods/freehit/caster" get attacker @ stringify smatch if
+ defender @ "status/statmods/freehit/caster" get attacker @ stringify smatch if
  1.0 accuracy !
  then
- who @ "status/statmods/semi-inv" get if
-         POKEDEX { "moves/" move @ "/semi-inv-breaker/" who @ "status/statmods/semi-inv" get }cat getprop if
+ defender @ "status/statmods/semi-inv" get if
+         POKEDEX { "moves/" move @ "/semi-inv-breaker/" defender @ "status/statmods/semi-inv" get }cat getprop if
  
-                 POKEDEX { "moves/" move @ "/semi-inv-breaker/" who @ "status/statmods/semi-inv" get }cat getprop atoi semi-inv-breaker !
+                 POKEDEX { "moves/" move @ "/semi-inv-breaker/" defender @ "status/statmods/semi-inv" get }cat getprop atoi semi-inv-breaker !
                  (for smackdown break the move from happening)
                  move @ "smack down" smatch if
-                        { "bounce" "fly" }list who @ "status/statmods/semi-inv" get array_findval array_count if
-                                POKESTORE { "@pokemon/" who @ "/@RP/status/statmods/semi-inv" }cat remove_prop
-                                loc @ { "@battle/" BID @ "/declare/" tpos @ }cat remove_prop
+                        { "bounce" "fly" }list defender @ "status/statmods/semi-inv" get array_findval array_count if
+                                POKESTORE { "@pokemon/" defender @ "/@RP/status/statmods/semi-inv" }cat remove_prop
+                                loc @ { "@battle/" BID @ "/declare/" temp_position @ }cat remove_prop
                         then
                  
                  then
@@ -4934,24 +4934,24 @@ move @ "doom desire" smatch or not if
                  0 accuracy !
          then
  then
- who @ { "status/statmods/lock-on/" pos @ "/count" }cat get if
+ defender @ { "status/statmods/lock-on/" position @ "/count" }cat get if
  1.0 accuracy !
  
  else
  
-  who @ "status/statmods/protected" get if
+  defender @ "status/statmods/protected" get if
   1 protected !
   move @ "thunder" smatch weather @ "rain dance" smatch and frand 0.3 <= and if
         0 protected !
-        { "^[o^[c" pos @ "." attacker @ id_name "'s^[y Thunder successfully broke the protection because of ^[cRain Dance^[y!" }cat notify_watchers
+        { "^[o^[c" position @ "." attacker @ id_name "'s^[y Thunder successfully broke the protection because of ^[cRain Dance^[y!" }cat notify_watchers
   then
   
   protected @ if
         POKEDEX { "moves/" move @ "/protect?" }cat getprop stringify "yes" smatch if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y but they were protected and unaffected!" }Cat notify_watchers
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y but they were protected and unaffected!" }Cat notify_watchers
           POKEDEX { "moves/" move @ "/effects" }cat getprop dup if "*faintafter*" smatch
           POKEDEX { "moves/" move @ "FaintBeforeUse" }cat getprop or if
-          loc @ { "@battle/" BID @ "/FaintAfterTurn/" pos @ }cat "yes" setprop
+          loc @ { "@battle/" BID @ "/FaintAfterTurn/" position @ }cat "yes" setprop
           then else pop then
           POKEDEX { "moves/" move @ "/misshurtself" }cat getprop if
           1 misshurtself !
@@ -4966,14 +4966,14 @@ then
 
 (Victory Star)
 
-pos @ 1 1 midstr "Victory Star" bid @ team_ability if
+position @ 1 1 midstr "Victory Star" BID @ team_ability if
 accuracy @ 1.1 * accuracy !
 then
  
  user @ "status/hp" get atoi user @ "maxhp" calculate 4 / <= if
-        POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
+        POKEDEX { "items/" defender @ "holding" get "/holdeffect" }cat getprop berryeffect !
         berryeffect @
-        pos @ user @ can_use_hold_item and
+        position @ user @ can_use_hold_item and
         if
                 berryeffect @ ":" explode_array foreach effect ! pop
                 effect @ "accuracy" smatch if
@@ -4988,20 +4988,20 @@ then
 
 
 (no guard)
-who @ "ability" fget "no guard" smatch
+defender @ "ability" fget "no guard" smatch
 user @ "ability" fget "no guard" smatch or if
 1.0 accuracy !
 then
 
 (wonder skin)
-who @ "ability" fget "wonder skin" smatch POKEDEX { "moves/" move @ "/power" }cat getprop atoi not and if
+defender @ "ability" fget "wonder skin" smatch POKEDEX { "moves/" move @ "/power" }cat getprop atoi not and if
 accuracy @ 0.5 > if 0.5 accuracy ! then
 then
 
 (Telepathy)
-pos @ 1 1 midstr tpos @ 1 1 midstr smatch who @ "ability" fget "telepathy" smatch and if
+position @ 1 1 midstr temp_position @ 1 1 midstr smatch defender @ "ability" fget "telepathy" smatch and if
         POKEDEX { "moves/" move @ "/power" }cat getprop if
-                { "^[o^[c" who @ id_name "^[y predicted ^[c" user @ id_name "'s^[y attack and dodged it!" }cat notify_watchers
+                { "^[o^[c" defender @ id_name "^[y predicted ^[c" user @ id_name "'s^[y attack and dodged it!" }cat notify_watchers
                 0 accuracy !
         then
 then
@@ -5012,17 +5012,17 @@ then
  frand accuracy @ > if
          attacker @ "status/statmods/movecontinued/times" 0 setto
          POKEDEX { "moves/" move @ "/missprotection" }cat getprop not if
-         loc @ { "@battle/" BID @ "/repeats/" POS @ }cat remove_prop
+         loc @ { "@battle/" BID @ "/repeats/" position @ }cat remove_prop
          then
           POKEDEX { "moves/" move @ "/misshurtself" }cat getprop if
           1 misshurtself !
           else
-          { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y and missed!" }Cat notify_watchers
+          { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y and missed!" }Cat notify_watchers
           1 sleep
           move @ "Relic Song" smatch 
           attacker @ "species" fget "648" smatch and if
           POKESTORE { "@pokemon/" attacker @ fid "/@temp/species" }cat "648p" setprop
-          { "^[o^[c" pos @ "." attacker @ id_name "^[y transforms into ^[c" POKEDEX { "pokemon/" attacker @ "species" fget "/Name" "^[y on ^[c" tpos @ "." who @ id_name "^[y and missed!" }Cat notify_watchers
+          { "^[o^[c" position @ "." attacker @ id_name "^[y transforms into ^[c" POKEDEX { "pokemon/" attacker @ "species" fget "/Name" "^[y on ^[c" temp_position @ "." defender @ id_name "^[y and missed!" }Cat notify_watchers
           then
                   POKEDEX { "moves/" move @ "/missprotection" }cat getprop if
                          effects
@@ -5032,21 +5032,21 @@ then
           then
  else
  (do the powerlevel stamping on this now)
- pos @ 1 1 midstr
- tpos @ 1 1 midstr smatch not if
- attacker @ who @ powerlevelset
+ position @ 1 1 midstr
+ temp_position @ 1 1 midstr smatch not if
+ attacker @ defender @ powerlevelset
  then
- who @ "ability" fget "pressure" smatch if
+ defender @ "ability" fget "pressure" smatch if
          POKEDEX { "moves/" move @ "/target" }cat getprop var! t-type
          t-type @ "ally" smatch
          t-type @ "allies" smatch or
          t-type @ "team-member" smatch or
          not
-         loc @ { "@battle/" BID @ "/pressure/" pos @ }cat getprop not and
+         loc @ { "@battle/" BID @ "/pressure/" position @ }cat getprop not and
          if
-                { "^[o^[c" tpos @ "." who @ id_name "^[y is asserting its Pressure!" }cat notify_watchers
+                { "^[o^[c" temp_position @ "." defender @ id_name "^[y is asserting its Pressure!" }cat notify_watchers
                 attacker @ { "/movesknown/" move @ "/pp" }cat over over fget atoi 1 - fsetto
-                loc @ { "@battle/" BID @ "/pressure/" pos @ }cat "yes" setprop
+                loc @ { "@battle/" BID @ "/pressure/" position @ }cat "yes" setprop
          then
  then
 then
@@ -5058,7 +5058,7 @@ then
  
  
 move @ "future attack" smatch not if
-(loc @ { "@battle/" BID @ "/beatup/" pos @ }cat getprop not if)
+(loc @ { "@battle/" BID @ "/beatup/" position @ }cat getprop not if)
         attacker @ "status/statmods/MoveContinued/MoveName" get if
          attacker @ { "status/statmods/SuccessfulMoves/" attacker @ "status/statmods/MoveContinued/MoveName" get }cat 1 setto
  then
@@ -5077,36 +5077,36 @@ if
         move @ "doom desire" smatch or
         if
  
-                { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y!" }cat notify_watchers
+                { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y!" }cat notify_watchers
  
-                loc @ { "@battle/" BID @ "/future attack/" tpos @ }cat propdir? if
+                loc @ { "@battle/" BID @ "/future attack/" temp_position @ }cat propdir? if
                 "^[o^[yBut it failed..." notify_watchers
                 exit
                 else
  
-                { "^[o^[c" pos @ "." attacker @ id_name "^[y predicts a future attack..." }cat notify_watchers
+                { "^[o^[c" position @ "." attacker @ id_name "^[y predicts a future attack..." }cat notify_watchers
  
-                loc @ { "@battle/" BID @ "/future attack/" tpos @ "/count" }Cat 3 setprop
-                loc @ { "@battle/" BID @ "/future attack/" tpos @ "/move" }Cat move @ setprop
-                loc @ { "@battle/" BID @ "/future attack/" tpos @ "/caster" }Cat attacker @ setprop
-                loc @ { "@battle/" BID @ "/future attack/" tpos @ "/casterpos" }cat pos @ 1 1 midstr setprop
+                loc @ { "@battle/" BID @ "/future attack/" temp_position @ "/count" }Cat 3 setprop
+                loc @ { "@battle/" BID @ "/future attack/" temp_position @ "/move" }Cat move @ setprop
+                loc @ { "@battle/" BID @ "/future attack/" temp_position @ "/caster" }Cat attacker @ setprop
+                loc @ { "@battle/" BID @ "/future attack/" temp_position @ "/casterpos" }cat position @ 1 1 midstr setprop
  
                 exit
                 then
  
  
         else
-                pos @ tpos @ smatch not if
-                 { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y!" }cat notify_watchers
+                position @ temp_position @ smatch not if
+                 { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y!" }cat notify_watchers
                 else
-                 { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on itself!" }cat notify_watchers
+                 { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on itself!" }cat notify_watchers
                 then
         then
  
  (check the guard moves now)
  
  (Quick Guard)
- loc @ { "@battle/" BID @ "/guards/" tpos @ 1 1 midstr "/Quick Guard" }cat getprop if
+ loc @ { "@battle/" BID @ "/guards/" temp_position @ 1 1 midstr "/Quick Guard" }cat getprop if
  POKEDEX { "moves/" move @ "/priority" }cat getprop atoi
     attacker @ "ability" fget "Prankster" smatch 
     POKEDEX { "moves/" move @ "/power" }cat getprop atoi not and
@@ -5120,7 +5120,7 @@ if
   then
  then
  
- loc @ { "@battle/" BID @ "/guards/" tpos @ 1 1 midstr "/Wide Guard" }cat getprop if
+ loc @ { "@battle/" BID @ "/guards/" temp_position @ 1 1 midstr "/Wide Guard" }cat getprop if
  { "self" "enemy" "Ally" "Random-enemy" }list
  POKEDEX { "moves/" move @ "/target" }cat getprop array_findval array_count not if
         { "^[o^[c" move @ cap "^[y was blocked by ^[cWide Guard^[y!" }cat notify_watchers
@@ -5130,7 +5130,7 @@ if
  then
  
         move @ "helping hand" smatch if
-                loc @ { "@Battle/" BID @ "/helping hand/" tpos @ }cat 1 setprop
+                loc @ { "@Battle/" BID @ "/helping hand/" temp_position @ }cat 1 setprop
         then
  
         { "detect" "protect" "endure" "quick guard" "wide guard" "king's shield" "spiky shield" }list temp !
@@ -5161,7 +5161,7 @@ if
                 then
                 
                 move @ "*guard" smatch if
-                loc @ { "@battle/" BID @ "/guards/" tpos @ 1 1 midstr "/" move @ }cat 1 setprop
+                loc @ { "@battle/" BID @ "/guards/" temp_position @ 1 1 midstr "/" move @ }cat 1 setprop
                 then
         then
 else
@@ -5169,12 +5169,12 @@ else
 (do round similar to pledges)
 
 move @ "round" smatch if
-        pos @ findrank 1 + loc @ { "@battle/" bid @ "/speed/rank/" }cat array_get_propvals array_count 1 for temp !
+        position @ findrank 1 + loc @ { "@battle/" BID @ "/speed/rank/" }cat array_get_propvals array_count 1 for temp !
                 loc @ { "@battle/" BID @ "/speed/rank/" temp @ }cat getprop temp2 !
-                pos @ 1 1 midstr temp2 @ 1 1 midstr smatch if
+                position @ 1 1 midstr temp2 @ 1 1 midstr smatch if
                         loc @ { "@battle/" BID @ "/declare/" temp2 @ }cat getprop  " " split swap pop "round" smatch if
                                 (this is to change rank)
-                                temp2 @ findrank pos @ findrank rankchange
+                                temp2 @ findrank position @ findrank rankchange
                                 loc @ { "@battle/" BID @ "/temp/round_boost/" temp2 @ }cat "yes" setprop
                         then
                 then
@@ -5196,17 +5196,17 @@ Also, only one pokemon does the move, and it comes out as double powered.
 )
 
 { "Fire Pledge" "Water Pledge" "Grass Pledge" }list move @  array_findval array_count if
-        loc @ { "@battle/" BID @ "/active pledge/" pos @ 1 1 midstr }cat getprop not if
-                pos @ findrank 1 + loc @ { "@battle/" bid @ "/speed/rank/" }cat array_get_propvals array_count 1 for temp ! 
+        loc @ { "@battle/" BID @ "/active pledge/" position @ 1 1 midstr }cat getprop not if
+                position @ findrank 1 + loc @ { "@battle/" BID @ "/speed/rank/" }cat array_get_propvals array_count 1 for temp ! 
                         loc @ { "@battle/" BID @ "/speed/rank/" temp @ }cat getprop temp2 !
-                        pos @ 1 1 midstr temp2 @ 1 1 midstr smatch if
+                        position @ 1 1 midstr temp2 @ 1 1 midstr smatch if
                                 loc @ { "@battle/" BID @ "/declare/" temp2 @ }cat getprop  " " split swap pop temp3 !
                                 temp3 @ move @ smatch not if
                                         { "Fire Pledge" "Water Pledge" "Grass Pledge" }list temp3 @  array_findval array_count 
                                         move @ temp3 @ smatch not and
                                         if
                                                 (once all of this is found to be true, change the place of this pokemon to after the user)
-                                                temp2 @ findrank pos @ findrank rankchange
+                                                temp2 @ findrank position @ findrank rankchange
                                                 move @ "fire pledge" smatch if
                                                         temp3 @ "water pledge" smatch if
                                                                 "water pledge"
@@ -5230,8 +5230,8 @@ Also, only one pokemon does the move, and it comes out as double powered.
                                                         then
                                                 then
                                                 temp2 !
-                                                loc @ { "@battle/" BID @ "/active pledge/" pos @ 1 1 midstr }cat temp2 @ setprop
-                                                { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y." }cat notify_watchers
+                                                loc @ { "@battle/" BID @ "/active pledge/" position @ 1 1 midstr }cat temp2 @ setprop
+                                                { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y." }cat notify_watchers
                                                 exit
                                         then
                                 then
@@ -5240,12 +5240,12 @@ Also, only one pokemon does the move, and it comes out as double powered.
         else
         
                 (effects)
-                loc @ { "@battle/" BID @ "/active pledge/" pos @ 1 1 midstr }cat getprop temp !
-                loc @ { "@battle/" bid @ "/active pledge/" pos @ 1 1 midstr }cat remove_prop
+                loc @ { "@battle/" BID @ "/active pledge/" position @ 1 1 midstr }cat getprop temp !
+                loc @ { "@battle/" BID @ "/active pledge/" position @ 1 1 midstr }cat remove_prop
                 temp @ "water pledge" smatch if
-                pos @ 1 1 midstr temp2 !
+                position @ 1 1 midstr temp2 !
                 else
-                        pos @ 1 1 midstr temp2 !
+                        position @ 1 1 midstr temp2 !
                         temp2 @ "A" smatch if
                                 "B" temp2 !
                         else
@@ -5260,23 +5260,23 @@ then
  
 move @ "sucker punch" smatch if (this needs to be fixed so it properly checks if a move was used.)
  
- loc @ { "@battle/" BID @ "/declare/" tpos @ }cat getprop if
-         loc @ { "@battle/" BID @ "/declare/" tpos @ }cat getprop " " split tmove ! ttype !
+ loc @ { "@battle/" BID @ "/declare/" temp_position @ }cat getprop if
+         loc @ { "@battle/" BID @ "/declare/" temp_position @ }cat getprop " " split target_move ! target_move_type !
  else
-         "none" tmove !
-         "none" ttype !
+         "none" target_move !
+         "none" target_move_type !
  then
- ttype @ "attack" smatch not
- POKEDEX { "moves/" tmove @ "/power" }cat getprop atoi not tmove @ "Me first" smatch not and or
- loc @ { "@Battle/" BID @ "/declare/finished/" tpos @ }cat getprop or
+ target_move_type @ "attack" smatch not
+ POKEDEX { "moves/" target_move @ "/power" }cat getprop atoi not target_move @ "Me first" smatch not and or
+ loc @ { "@Battle/" BID @ "/declare/finished/" temp_position @ }cat getprop or
  if
-  { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y, but fails!" }cat notify_watchers
+  { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y, but fails!" }cat notify_watchers
  exit
  then
 then
  
 move @ "future attack" smatch if
-{ "^[o^[yThe predicted attack hits ^[c" tpos @ "." who @ id_name "^[y!" }cat notify_watchers
+{ "^[o^[yThe predicted attack hits ^[c" temp_position @ "." defender @ id_name "^[y!" }cat notify_watchers
 then
  
 (use here to set up the multi hit moves, which are moves that hit more than once per turn) (put the new beatup mechanics here)
@@ -5298,15 +5298,15 @@ POKEDEX { "moves/" move @ "/sethit" }Cat getprop if
 POKEDEX { "moves/" move @ "/sethit" }Cat getprop atoi hittimes !
 then
 
-pos @ 1 1 midstr var! team 
+position @ 1 1 midstr var! team 
 (beatup)
 move @ "beat up" smatch if
 (store in a temp somewhere the power values, doing the math as needed and such)
         (loop though your team and get the power values as needed)
         
-        loc @ { "@battle/" bid @ "/temp/beatup/" team @ }cat remove_prop
+        loc @ { "@battle/" BID @ "/temp/beatup/" team @ }cat remove_prop
         0 temp3 !
-        loc @ { "@battle/" bid @ "/teams/" team @ "/" }cat array_get_propvals foreach temp2 ! pop
+        loc @ { "@battle/" BID @ "/teams/" team @ "/" }cat array_get_propvals foreach temp2 ! pop
         temp3 @ 6 = if break then
         temp2 @ "status/hp" get atoi if "ok" temp ! then
          
@@ -5329,18 +5329,18 @@ then
 1 hittimes @ 1 for turncount !
         (endmulti)
           (do sap sipper)
-          who @ "ability" fget "sap sipper" smatch
-          who @ "status/statmods/substitute" get not and
+          defender @ "ability" fget "sap sipper" smatch
+          defender @ "status/statmods/substitute" get not and
           move @  "Aromatherapy" smatch not and
           user @ { "moves/" move @ "/type" }cat get "grass" smatch and
           if
            (add the attack, say it was sucked, end turn of attack)
            
-           { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y!" }cat notify_watchers
-           { "^[o^[c" tpos @ "." who @ id_name "'s^[y ability ^[cSap Sipper^[y protected it!"  }cat notify_watchers
-           who @ "status/statmods/PhysAtk" get atoi 6 < if
-                who @ "status/statmods/PhysAtk" over over get atoi 1 + setto
-                { "^[o^[c" who @ id_name "'s ^[yPhysAtk raised!"  }cat notify_watchers
+           { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y!" }cat notify_watchers
+           { "^[o^[c" temp_position @ "." defender @ id_name "'s^[y ability ^[cSap Sipper^[y protected it!"  }cat notify_watchers
+           defender @ "status/statmods/PhysAtk" get atoi 6 < if
+                defender @ "status/statmods/PhysAtk" over over get atoi 1 + setto
+                { "^[o^[c" defender @ id_name "'s ^[yPhysAtk raised!"  }cat notify_watchers
            then
            
           1 sleep
@@ -5362,7 +5362,7 @@ then
                 user @ "holding" get "Scope Lens" smatch
                 user @ "holding" get "Razor Claw" smatch
                 or
-                pos @ user @ can_use_hold_item and
+                position @ user @ can_use_hold_item and
                 if
                 chlev @ 1 + chlev ! then
  
@@ -5374,7 +5374,7 @@ then
                 user @ "holding" get "Luckey Punch" smatch
                 user @ "species" fget "113" smatch and
                 or
-                pos @ user @ can_use_hold_item and
+                position @ user @ can_use_hold_item and
                 if
                 chlev @ 2 + chlev ! then
  
@@ -5406,12 +5406,12 @@ then
                         then
                 then
         then
-        loc @ { "@battle/" BID @ "/shields/" tpos @ 1 1 midstr "/lucky chant" }cat getprop if
+        loc @ { "@battle/" BID @ "/shields/" temp_position @ 1 1 midstr "/lucky chant" }cat getprop if
         1 CH !
         then
  
-        who @ "ability" fget "battle armor" smatch
-        who @ "ability" fget "shell armor" smatch or
+        defender @ "ability" fget "battle armor" smatch
+        defender @ "ability" fget "shell armor" smatch or
         user @ moldbreaker
         if
         1 CH !
@@ -5426,7 +5426,7 @@ then
  
         CH @ 1 > if
  
-        who @ "ability" fget "unaware" smatch
+        defender @ "ability" fget "unaware" smatch
         user @ moldbreaker
         if
                 user @ "status/statmods/PhysAtk" get atoi  temp ! user @ "status/statmods/PhysAtk" 0 setto
@@ -5450,18 +5450,18 @@ then
 
  
  
-        who @ "status/statmods/PhysDef" get atoi dup temp ! 0 > if who @ "status/statmods/PhysDef" 0 setto then
-        who @ "PhysDef" move @ "IgnoreStatMods" get if basecalculate else calculate then PhysDef !
-        who @ "status/statmods/PhysDef" temp @ setto
+        defender @ "status/statmods/PhysDef" get atoi dup temp ! 0 > if defender @ "status/statmods/PhysDef" 0 setto then
+        defender @ "PhysDef" move @ "IgnoreStatMods" get if basecalculate else calculate then PhysDef !
+        defender @ "status/statmods/PhysDef" temp @ setto
  
-        who @ "status/statmods/SpecDef" get atoi dup temp ! 0 > if who @ "status/statmods/SpecDef" 0 setto then
-        who @ "Specdef" move @ "IgnoreStatMods" get if basecalculate else calculate then SpecDef !
-        who @ "status/statmods/SpecDef" temp @ setto
+        defender @ "status/statmods/SpecDef" get atoi dup temp ! 0 > if defender @ "status/statmods/SpecDef" 0 setto then
+        defender @ "Specdef" move @ "IgnoreStatMods" get if basecalculate else calculate then SpecDef !
+        defender @ "status/statmods/SpecDef" temp @ setto
  
  
         else
         var beforestockpile
-        who @ "ability" fget "unaware" smatch
+        defender @ "ability" fget "unaware" smatch
         user @ moldbreaker
         if
                 user @ "status/statmods/PhysAtk" get atoi dup temp ! 0 > if user @ "status/statmods/PhysAtk" 0 setto then
@@ -5481,53 +5481,53 @@ then
         then
         
         move @ "foul play" smatch if
-          who @ "PhysAtk" Calculate PhysAtk !
+          defender @ "PhysAtk" Calculate PhysAtk !
         then
         (this is so mold breaker works in the stat calculator for simple)
         1 user @ moldbreaker not if
  
-        who @ "status/statmods/Mold Broken" 1 setto
+        defender @ "status/statmods/Mold Broken" 1 setto
         then
  
         user @ "ability" fget "unaware" smatch
         if
  
-        who @ "status/statmods/PhysDef" get atoi beforestockpile !
-        who @ "status/statmods/PhysDef" over over get atoi who @ "status/statmods/stockpile" get atoi + setto
+        defender @ "status/statmods/PhysDef" get atoi beforestockpile !
+        defender @ "status/statmods/PhysDef" over over get atoi defender @ "status/statmods/stockpile" get atoi + setto
  
         (add in the check for moves that raise def while charging)
-        loc @ { "@battle/" bid @ "/charge/" pos @ "/charging/" tpos @ }Cat getprop if
-                loc @ { "@battle/" bid @ "/charge/" pos @ "/charging/" tpos @ "/move" }Cat getprop "Skull Bash" smatch if
-                        who @ "status/statmods/PhysDef" over over get atoi 1 + setto
+        loc @ { "@battle/" BID @ "/charge/" position @ "/charging/" temp_position @ }Cat getprop if
+                loc @ { "@battle/" BID @ "/charge/" position @ "/charging/" temp_position @ "/move" }Cat getprop "Skull Bash" smatch if
+                        defender @ "status/statmods/PhysDef" over over get atoi 1 + setto
                 then
         then
  
-        who @ "status/statmods/PhysDef" get atoi 0 > if who @ "status/statmods/PhysDef" 0 setto then
+        defender @ "status/statmods/PhysDef" get atoi 0 > if defender @ "status/statmods/PhysDef" 0 setto then
  
-        who @ "PhysDef" move @ "IgnoreStatMods" get if basecalculate else calculate then PhysDef !
-        who @ "status/statmods/PhysDef" beforestockpile @ setto
+        defender @ "PhysDef" move @ "IgnoreStatMods" get if basecalculate else calculate then PhysDef !
+        defender @ "status/statmods/PhysDef" beforestockpile @ setto
  
-        who @ "status/statmods/SpecDef" get atoi beforestockpile !
-        who @ "status/statmods/SpecDef" over over get atoi who @ "status/statmods/stockpile" get atoi + setto
+        defender @ "status/statmods/SpecDef" get atoi beforestockpile !
+        defender @ "status/statmods/SpecDef" over over get atoi defender @ "status/statmods/stockpile" get atoi + setto
  
-        who @ "status/statmods/SpecDef" get atoi 0 > if who @ "status/statmods/SpecDef" 0 setto then
+        defender @ "status/statmods/SpecDef" get atoi 0 > if defender @ "status/statmods/SpecDef" 0 setto then
  
-        who @ "SpecDef" move @ "IgnoreStatMods" get if basecalculate else calculate then SpecDef !
-        who @ "Status/statmods/Specdef" beforestockpile @ setto
+        defender @ "SpecDef" move @ "IgnoreStatMods" get if basecalculate else calculate then SpecDef !
+        defender @ "Status/statmods/Specdef" beforestockpile @ setto
  
         else
  
-        who @ "status/statmods/PhysDef" get atoi beforestockpile !
-        who @ "status/statmods/PhysDef" over over get atoi who @ "status/statmods/stockpile" get atoi + setto
+        defender @ "status/statmods/PhysDef" get atoi beforestockpile !
+        defender @ "status/statmods/PhysDef" over over get atoi defender @ "status/statmods/stockpile" get atoi + setto
  
-        who @ "PhysDef" move @ "IgnoreStatMods" get if basecalculate else calculate then PhysDef !
-        who @ "status/statmods/PhysDef" beforestockpile @ setto
+        defender @ "PhysDef" move @ "IgnoreStatMods" get if basecalculate else calculate then PhysDef !
+        defender @ "status/statmods/PhysDef" beforestockpile @ setto
  
-        who @ "status/statmods/SpecDef" get atoi beforestockpile !
-        who @ "status/statmods/SpecDef" over over get atoi who @ "status/statmods/stockpile" get atoi + setto
+        defender @ "status/statmods/SpecDef" get atoi beforestockpile !
+        defender @ "status/statmods/SpecDef" over over get atoi defender @ "status/statmods/stockpile" get atoi + setto
  
-        who @ "SpecDef" move @ "IgnoreStatMods" get if basecalculate else calculate then SpecDef !
-        who @ "Status/statmods/Specdef" beforestockpile @ setto
+        defender @ "SpecDef" move @ "IgnoreStatMods" get if basecalculate else calculate then SpecDef !
+        defender @ "Status/statmods/Specdef" beforestockpile @ setto
  
         then
  
@@ -5536,7 +5536,7 @@ then
        move @ "beat up" smatch if
        user "Physatk" basecalculate PhysAtk !
        then
-        who @ "status/statmods/Mold Broken" 0 setto
+        defender @ "status/statmods/Mold Broken" 0 setto
         (stat changing abilities go here)
         user @ "ability" fget "slow start" smatch if
                 user @ "status/statmods/ability/slow start" get atoi 5 > not if
@@ -5544,7 +5544,7 @@ then
                 then
         then
  
-        pos @ "Flower Gift" bid @ team_ability if
+        position @ "Flower Gift" BID @ team_ability if
         PhysAtk @ 1.5 * floor PhysAtk !
         then
  
@@ -5560,7 +5560,7 @@ then
  
         user @ "ability" fget "rivalry" smatch if
                 user @ "gender" fget temp !
-                who @ "gender" fget temp2 !
+                defender @ "gender" fget temp2 !
  
                 temp @ "male" smatch
                 temp @ "female" smatch or
@@ -5590,11 +5590,11 @@ then
         user @ "ability" fget "plus" smatch
         user @ "ability" fget "minus" smatch or if
         
-                pos @ "plus" bid @ team_ability pos @ "minus" bid @ team_ability + 2 >= if
+                position @ "plus" BID @ team_ability position @ "minus" BID @ team_ability + 2 >= if
                         SpecAtk @ 1.5 * floor SpecAtk !
                 then
         then 
-        who @ "ability" fget "marvel scale" smatch
+        defender @ "ability" fget "marvel scale" smatch
         user @ moldbreaker
         if
                 user @ check_Status if
@@ -5602,14 +5602,14 @@ then
                 then
         then
  
-        tpos @ "Flower Gift" bid @ team_ability
+        temp_position @ "Flower Gift" BID @ team_ability
         user @ moldbreaker
         if
                 SpecDef @ 1.5 * floor SpecDef !
         then
  
-        who @ typelist "rock" array_findval array_count
-        bid @ check_weather "sandstorm" smatch and
+        defender @ typelist "rock" array_findval array_count
+        BID @ check_weather "sandstorm" smatch and
         if
                 SpecDef @ 1.5 * floor SpecDef !
         then
@@ -5633,7 +5633,7 @@ then
         var STAB
  
         move @ "future attack" smatch if
-        loc @ { "@battle/" BID @ "/future attack/" tpos @ "/move" }cat getprop move !
+        loc @ { "@battle/" BID @ "/future attack/" temp_position @ "/move" }cat getprop move !
         then
  
         POKEDEX { "moves/" move @ "/class" }cat getprop "none" smatch if
@@ -5645,7 +5645,7 @@ then
         PhysAtk @  attack !
         PhysDef @  defense !
         ch @ 1 = if
-        loc @ { "@battle/" BID @ "/shields/" tpos @ 1 1 midstr "/reflect" }cat getprop  user @ "Ability" fget "Infiltrator" smatch not and if 1 shield ! then then
+        loc @ { "@battle/" BID @ "/shields/" temp_position @ 1 1 midstr "/reflect" }cat getprop  user @ "Ability" fget "Infiltrator" smatch not and if 1 shield ! then then
         then
  
         POKEDEX { "moves/" move @ "/class" }cat getprop "special" smatch if
@@ -5656,7 +5656,7 @@ then
         PhysDef @  defense !
         then
         ch @ 1 = if
-        loc @ { "@battle/" BID @ "/shields/" tpos @ 1 1 midstr "/light screen" }cat getprop user @ "Ability" fget "Infiltrator" smatch not and if 1 shield ! then then
+        loc @ { "@battle/" BID @ "/shields/" temp_position @ 1 1 midstr "/light screen" }cat getprop user @ "Ability" fget "Infiltrator" smatch not and if 1 shield ! then then
         then
         
         POKEDEX { "moves/" move @ "/effects" }cat getprop dup if "*Shieldbreaker*" smatch if 0 shield ! then else pop then
@@ -5687,7 +5687,7 @@ then
  
         level @ 2 * 5 / 2 + temp1 !
         (define weather here so it can be used in the base power formula)
-        bid @ check_weather weather !
+        BID @ check_weather weather !
  
  
         POKEDEX { "moves/" move @ "/power" }cat getprop atoi basepower !
@@ -5696,14 +5696,14 @@ then
         basepower @ variable_attack basepower !
         
         basepower @ 0 < if
-        { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" tpos @ "." who @ id_name "^[y but it failed!" }Cat notify_watchers
+        { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y on ^[c" temp_position @ "." defender @ id_name "^[y but it failed!" }Cat notify_watchers
         exit then
  
         ( user @ basepower @ intostr "BasePower" CheckTriggers atoi basepower ! )
-        move @ "triple kick" smatch if basepower @ tkdamage @ + basepower ! then
+        move @ "triple kick" smatch if basepower @ triple_kick_damage @ + basepower ! then
  
  
-        loc @ { "@Battle/" BID @ "/helping hand/" pos @ }cat getprop if
+        loc @ { "@Battle/" BID @ "/helping hand/" position @ }cat getprop if
                 basepower @ 1.5 * floor basepower !
         then
         
@@ -5788,8 +5788,8 @@ then
                 if
                         basepower @ 1.3 * floor basepower !
                 then
-        loc @ { "@battle/" BID @ "/temp/mefirst/" pos @ }cat getprop if
-                loc @ { "@battle/" BID @ "/temp/mefirst/" pos @ }cat remove_prop
+        loc @ { "@battle/" BID @ "/temp/mefirst/" position @ }cat getprop if
+                loc @ { "@battle/" BID @ "/temp/mefirst/" position @ }cat remove_prop
                 basepower @ 1.5 * floor basepower !
         then
  
@@ -5803,7 +5803,7 @@ then
         then
         
                 attacker @ "ability" fget "Analytic" smatch if
-                loc @ { "@battle/" BID @ "/declare/finished/" tpos @ }cat getprop if
+                loc @ { "@battle/" BID @ "/declare/finished/" temp_position @ }cat getprop if
                         basepower @ 1.3 * floor basepower !
                 then
                 then
@@ -5812,7 +5812,7 @@ then
         var lifeorb
  
         user @ "holding" get "Life Orb" smatch
-        pos @ user @ can_use_hold_item and
+        position @ user @ can_use_hold_item and
         if
         user @ "ability" fget "Magic Guard" smatch 
         user @ "ability" fget "sheer force" smatch or
@@ -5885,10 +5885,10 @@ then
         then
         STAB !
  
-        tpos @ typetotalcalculate var! typetotal
+        temp_position @ typetotalcalculate var! typetotal
  
         (typetotal @ 100 * typetotal !)
-        ( who @ typetotal @ intostr "DefenseTypeImmunity" CheckTriggers atoi 100.0 / typetotal ! )
+        ( defender @ typetotal @ intostr "DefenseTypeImmunity" CheckTriggers atoi 100.0 / typetotal ! )
  
         POKEDEX { "moves/" move @ "/typeless?" }cat getprop stringify if 1 typetotal ! then
         typetotal @ not
@@ -5897,7 +5897,7 @@ then
           1 typetotal !
         then
  
-        loc @ { "@battle/" BID @ "/beatup/" pos @ }cat getprop if
+        loc @ { "@battle/" BID @ "/beatup/" position @ }cat getprop if
         1 typetotal !
         then
  
@@ -5908,7 +5908,7 @@ then
         typetotal @ 1 < if typetotal @ 2 * typetotal ! then
         then
  
-        who @ "ability" fget "Wonder Guard" smatch
+        defender @ "ability" fget "Wonder Guard" smatch
         user @ moldbreaker
         POKEDEX { "moves/" move @ "/typeless?" }cat getprop stringify not and
                 if     
@@ -5926,18 +5926,18 @@ then
         damage @ not typetotal @ and if 1 damage ! then
  
         (this is to check if an ability that absorbes damage and restores hp is in effect, if not it'll do damage)
-        who @ "ability" fget "Water Absorb" smatch movetype @ "water" smatch and
-        who @ "ability" fget "Volt Absorb" smatch movetype @ "electric" smatch and
+        defender @ "ability" fget "Water Absorb" smatch movetype @ "water" smatch and
+        defender @ "ability" fget "Volt Absorb" smatch movetype @ "electric" smatch and
         or
         user @ moldbreaker
         if
-          { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" tpos @ cap "." who @ id_name "^[y, but because of its ability ^[c" who @ "ability" fget cap "^[y, it was absorbed!"
+          { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" temp_position @ cap "." defender @ id_name "^[y, but because of its ability ^[c" defender @ "ability" fget cap "^[y, it was absorbed!"
          }cat notify_watchers
-         who @ "MaxHP"   Calculate var! maxhp
-         maxhp @ 4 who @ "pvp/hpboost" fget dup if atoi * else pop then divdamage damage !
-         who @ "status/hp" over over get atoi damage @ + setto
-         who @ "status/hp" get atoi maxhp @ > if
-         who @ "status/hp" maxhp @ setto then
+         defender @ "MaxHP"   Calculate var! maxhp
+         maxhp @ 4 defender @ "pvp/hpboost" fget dup if atoi * else pop then divdamage damage !
+         defender @ "status/hp" over over get atoi damage @ + setto
+         defender @ "status/hp" get atoi maxhp @ > if
+         defender @ "status/hp" maxhp @ setto then
          0 typetotal !
  
  
@@ -5990,15 +5990,15 @@ then
         then
  
         (for any other damage effecting abilities)
-        who @ "ability" fget "Filter" smatch
-        who @ "ability" fget "Solid Rock" smatch or
+        defender @ "ability" fget "Filter" smatch
+        defender @ "ability" fget "Solid Rock" smatch or
         attacker @ moldbreaker
         if
                 typetotal @ 1 > if damage @ 3 * 4 divdamage damage ! then
         then
         
 
-        who @ "ability" fget "Heatproof" smatch
+        defender @ "ability" fget "Heatproof" smatch
         attacker @ moldbreaker
         if
                 movetype @ "fire" smatch if damage @ 2 divdamage damage ! then
@@ -6008,14 +6008,14 @@ then
         (set damage moves)
         move @ "counter" smatch if
         0 lifeorb !
-                { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y!" }Cat notify_watchers
-                loc @ { "@battle/" BID @ "/lasthit/" pos @ "/class" }cat getprop stringify "physical" smatch not if
+                { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y!" }Cat notify_watchers
+                loc @ { "@battle/" BID @ "/lasthit/" position @ "/class" }cat getprop stringify "physical" smatch not if
                         "^[o^[yBut it failed..." notify_watchers exit
                 then
-                loc @ { "@battle/" BID @ "/lasthit/" pos @ "/damage" }cat getprop 2 * damage !
-                loc @ { "@battle/" BID @ "/lasthit/" pos @ "/target" }cat getprop tpos !
-                loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop who !
-                who @ not if
+                loc @ { "@battle/" BID @ "/lasthit/" position @ "/damage" }cat getprop 2 * damage !
+                loc @ { "@battle/" BID @ "/lasthit/" position @ "/target" }cat getprop temp_position !
+                loc @ { "@battle/" BID @ "/position/" temp_position @ }cat getprop defender !
+                defender @ not if
                         "^[o^[yBut it failed..." notify_watchers exit
                 then
                 typetotal @ not if 0 damage !  else 1 typetotal ! then
@@ -6023,17 +6023,17 @@ then
  
         move @ "mirror coat" smatch if
         0 lifeorb !
-                { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y!" }Cat notify_watchers
-                loc @ { "@battle/" BID @ "/lasthit/" pos @ "/class" }cat getprop stringify "special" smatch not if
+                { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y!" }Cat notify_watchers
+                loc @ { "@battle/" BID @ "/lasthit/" position @ "/class" }cat getprop stringify "special" smatch not if
                         "^[o^[yBut it failed..." notify_watchers exit
                 then
-                loc @ { "@battle/" BID @ "/lasthit/" pos @ "/damage" }cat getprop 2 * damage !
+                loc @ { "@battle/" BID @ "/lasthit/" position @ "/damage" }cat getprop 2 * damage !
                 damage @ not if
                         "^[o^[yBut it failed..." notify_watchers exit
                 then
-                loc @ { "@battle/" BID @ "/lasthit/" pos @ "/target" }cat getprop tpos !
-                loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop who !
-                who @ not if
+                loc @ { "@battle/" BID @ "/lasthit/" position @ "/target" }cat getprop temp_position !
+                loc @ { "@battle/" BID @ "/position/" temp_position @ }cat getprop defender !
+                defender @ not if
                         "^[o^[yBut it failed..." notify_watchers exit
                 then
                 typetotal @ not if 0 damage !  else 1 typetotal ! then
@@ -6041,14 +6041,14 @@ then
  
         move @ "metal burst" smatch if
         0 lifeorb !
-                { "^[o^[c" pos @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y!" }Cat notify_watchers
-                loc @ { "@battle/" BID @ "/lasthit/" pos @ "/class" }cat getprop not if
+                { "^[o^[c" position @ "." attacker @ id_name "^[y uses ^[c" move @ cap "^[y!" }Cat notify_watchers
+                loc @ { "@battle/" BID @ "/lasthit/" position @ "/class" }cat getprop not if
                         "^[o^[yBut it failed..." notify_watchers exit
                 then
-                loc @ { "@battle/" BID @ "/lasthit/" pos @ "/damage" }cat getprop 2 * damage !
-                loc @ { "@battle/" BID @ "/lasthit/" pos @ "/target" }cat getprop tpos !
-                loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop who !
-                who @ not if
+                loc @ { "@battle/" BID @ "/lasthit/" position @ "/damage" }cat getprop 2 * damage !
+                loc @ { "@battle/" BID @ "/lasthit/" position @ "/target" }cat getprop temp_position !
+                loc @ { "@battle/" BID @ "/position/" temp_position @ }cat getprop defender !
+                defender @ not if
                         "^[o^[yBut it failed..." notify_watchers exit
                 then
                 1 typetotal !
@@ -6056,8 +6056,8 @@ then
  
         move @ "bide" smatch if
         0 lifeorb !
-                loc @ { "@Battle/" BID @ "/bide/" pos @ "/damage" }cat getprop 2 * damage !
-                loc @ { "@battle/" BID @ "/bide/" pos @ }cat remove_prop
+                loc @ { "@Battle/" BID @ "/bide/" position @ "/damage" }cat getprop 2 * damage !
+                loc @ { "@battle/" BID @ "/bide/" position @ }cat remove_prop
                 1 typetotal !
         then
  
@@ -6090,10 +6090,10 @@ then
  
         POKEDEX { "moves/" move @ "/OHKO" }cat getprop dup not if pop "no" then "yes" smatch if
                 typetotal @ not if
-                { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" tpos @ cap "." who @ id_name "^[y, but it failed..." }cat notify_watchers exit
+                { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" temp_position @ cap "." defender @ id_name "^[y, but it failed..." }cat notify_watchers exit
                 else
                 1 typetotal !
-                who @ "maxhp" calculate damage !
+                defender @ "maxhp" calculate damage !
                 then
         then
         (end set damage)
@@ -6102,53 +6102,53 @@ then
         move @ "Endeavor" smatch if
         0 lifeorb !
                 typetotal @ not if
-                { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" tpos @ cap "." who @ id_name "^[y, but it failed..." }cat notify_watchers exit
+                { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" temp_position @ cap "." defender @ id_name "^[y, but it failed..." }cat notify_watchers exit
                 then
                 1 typetotal !
                 attacker @ "status/hp" get atoi
-                who @ "status/hp" get atoi > if
-                        { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" tpos @ cap "." who @ id_name "^[y, but it failed..." }cat notify_watchers exit
+                defender @ "status/hp" get atoi > if
+                        { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" temp_position @ cap "." defender @ id_name "^[y, but it failed..." }cat notify_watchers exit
                 then
-                who @ "status/hp" get atoi
+                defender @ "status/hp" get atoi
                 attacker @ "status/hp" get atoi - damage !
         then
  
         move @ "super fang" smatch if
         0 lifeorb !
                 typetotal @ not if
-                { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" tpos @ cap "." who @ id_name "^[y, but it failed..." }cat notify_watchers exit
+                { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" temp_position @ cap "." defender @ id_name "^[y, but it failed..." }cat notify_watchers exit
                 then
                 1 typetotal !
-                who @ "status/hp" get atoi 2 who @ "pvp/hpboost" fget dup if atoi * else pop then divdamage damage !
+                defender @ "status/hp" get atoi 2 defender @ "pvp/hpboost" fget dup if atoi * else pop then divdamage damage !
         then
  
         (end special)
         
         (Friend Guard Ability)
-        attacker @ "ability" fget "Friend Guard" smatch tpos @ 1 1 midstr pos @ 1 1 midstr smatch and if
+        attacker @ "ability" fget "Friend Guard" smatch temp_position @ 1 1 midstr position @ 1 1 midstr smatch and if
                 damage @ damage @ 0.25 * - damage !
         then
  
         heal @ if
         0 lifeorb !
         (this is where the present's heal goes into play)
-        who @ "status/hp" over over get atoi heal @ + setto
-        who @ "status/hp" get atoi who @ "maxhp" calculate > if
-        who @ "status/hp" who @ "maxhp" calculate setto
+        defender @ "status/hp" over over get atoi heal @ + setto
+        defender @ "status/hp" get atoi defender @ "maxhp" calculate > if
+        defender @ "status/hp" defender @ "maxhp" calculate setto
         then
-        { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" tpos @ cap "." who @ id_name "^[y, and healed some of its health!" }cat notify_watchers
+        { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" temp_position @ cap "." defender @ id_name "^[y, and healed some of its health!" }cat notify_watchers
         else
         misshurtself @ if
         (this is where moves that hurt yourself when you miss do the damage)
         0 misshurtself !
         (gen 4 way to do damage is commented out
-        who @ "status/hp" get atoi damage @ <= if who @ "status/hp" get atoi damage ! then
+        defender @ "status/hp" get atoi damage @ <= if defender @ "status/hp" get atoi damage ! then
  
         damage @ 2 divdamage damage ! )
         
-        who @ "maxhp" calculate 2 divdamage damage !
+        defender @ "maxhp" calculate 2 divdamage damage !
         
-        { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" tpos @ cap "." who @ id_name "^[y but missed and hurt itself!" }cat notify_watchers
+        { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" temp_position @ cap "." defender @ id_name "^[y but missed and hurt itself!" }cat notify_watchers
         attacker @ "status/hp" over over get atoi damage @ - setto
                  attacker @ "status/hp" get atoi 0 <= if
                  POKESTORE { "@pokemon/" attacker @ "/@RP/status" }cat remove_prop
@@ -6157,41 +6157,41 @@ then
  
                 then
         else
-        who @ "ability" fget "Dry skin" smatch movetype @ "water" smatch and
+        defender @ "ability" fget "Dry skin" smatch movetype @ "water" smatch and
         attacker @ moldbreaker
         if
         0 damage !
-        who @ "status/hp" over over get atoi who @ "maxhp" calculate 4 who @ "pvp/hpboost" fget dup if atoi * else pop then divdamage + setto
-        who @ "status/hp" get atoi who @ "maxhp" calculate > if
-                who @ "status/hp" who @ "maxhp" calculate setto
+        defender @ "status/hp" over over get atoi defender @ "maxhp" calculate 4 defender @ "pvp/hpboost" fget dup if atoi * else pop then divdamage + setto
+        defender @ "status/hp" get atoi defender @ "maxhp" calculate > if
+                defender @ "status/hp" defender @ "maxhp" calculate setto
         then
         1 noeffect !
-        { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" tpos @ cap "." who @ id_name "^[y, but because of its ability ^[c" who @ "ability" fget cap "^[y, they were healed!"
+        { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" temp_position @ cap "." defender @ id_name "^[y, but because of its ability ^[c" defender @ "ability" fget cap "^[y, they were healed!"
          }cat notify_watchers
  
         else
  
-        who @ "ability" fget "flash fire" smatch movetype @ "fire" smatch and
+        defender @ "ability" fget "flash fire" smatch movetype @ "fire" smatch and
         attacker @ moldbreaker
-        (who @ "status/frozen" get not and)
+        (defender @ "status/frozen" get not and)
         if
         0 damage !
         1 noeffect !
-        who @ "status/statmods/damageboost/fire" get not if
-        who @ "status/statmods/damageboost/fire" 1 setto
-        { "^[o^[c" tpos @ "." who @ id_name "'s^[y ability ^[cFlash Fire^[y has been activated!"  }cat notify_watchers
+        defender @ "status/statmods/damageboost/fire" get not if
+        defender @ "status/statmods/damageboost/fire" 1 setto
+        { "^[o^[c" temp_position @ "." defender @ id_name "'s^[y ability ^[cFlash Fire^[y has been activated!"  }cat notify_watchers
         then
         then
         
-        who @ "ability" fget "Storm Drain" smatch movetype @ "water" smatch and 
-        who @ "ability" fget "Lightningrod" smatch movetype @ "electric" smatch and or
+        defender @ "ability" fget "Storm Drain" smatch movetype @ "water" smatch and 
+        defender @ "ability" fget "Lightningrod" smatch movetype @ "electric" smatch and or
         attacker @ moldbreaker
         if
-        { "^[o^[c" tpos @ "." who @ id_name "^[y is immune to damage!" }cat notify_watchers
+        { "^[o^[c" temp_position @ "." defender @ id_name "^[y is immune to damage!" }cat notify_watchers
         0 damage !
-        who @ "status/statmods/Specatk" get atoi 6 > not if
-                who @ "status/statmods/Specatk" over over get atoi 1 + setto
-                { "^[o^[c" tpos @ "." who @ id_name "'s^[y Specal Attack Boosted!" }cat notify_watchers
+        defender @ "status/statmods/Specatk" get atoi 6 > not if
+                defender @ "status/statmods/Specatk" over over get atoi 1 + setto
+                { "^[o^[c" temp_position @ "." defender @ id_name "'s^[y Specal Attack Boosted!" }cat notify_watchers
         
         then
         then
@@ -6200,13 +6200,13 @@ then
         damage @ 1.33 * floor damage !
         then
         
-        who @ "ability" fget "dry skin" smatch movetype @ "fire" smatch and
+        defender @ "ability" fget "dry skin" smatch movetype @ "fire" smatch and
         attacker @ moldbreaker
         if
         damage @ 1.25 * floor damage !
         then
  
-        who @ "ability" fget "thick fat" smatch
+        defender @ "ability" fget "thick fat" smatch
         movetype @ "fire" smatch
         movetype @ "ice" smatch or and
         attacker @ moldbreaker
@@ -6215,14 +6215,14 @@ then
         then
  
          movetype @ "fire" smatch
-         who @ "status/frozen" get and
+         defender @ "status/frozen" get and
          if
-                who @ "status/frozen" 0 setto
-                { "^[o^[c" pos @ "." who @ id_name "^[y was unfrozen by the attack!" }cat notify_watchers
+                defender @ "status/frozen" 0 setto
+                { "^[o^[c" position @ "." defender @ id_name "^[y was unfrozen by the attack!" }cat notify_watchers
          then
  
          var damper
-         damage @ 100 * who @ "maxhp" calculate / damper !
+         damage @ 100 * defender @ "maxhp" calculate / damper !
          var damphrase
          damper @ 100 >= if "EPIC" damphrase ! then
          damper @ 99  <= if "extreme" damphrase ! then
@@ -6242,15 +6242,15 @@ then
         damage @ not typetotal @ and noeffect @ not and if 1 damage ! then
         damage @ var! RealDamage
         var truemaxhp
-        who @ "status/statmods/substitute" get if
-        who @ "status/statmods/substitute" get atoi truemaxhp !
+        defender @ "status/statmods/substitute" get if
+        defender @ "status/statmods/substitute" get atoi truemaxhp !
         else
-        who @ "status/hp" get atoi truemaxhp !
+        defender @ "status/hp" get atoi truemaxhp !
         then
                   truemaxhp @  damage @ <= if
                   move @ "false swipe" smatch
-                  who @ "status/statmods/enduring" get or
-                  who @ "status/statmods/substitute" get not and
+                  defender @ "status/statmods/enduring" get or
+                  defender @ "status/statmods/substitute" get not and
                   if
                          truemaxhp @ 1 - damage !  (make sure to make this not work with substitutes)
                          else
@@ -6258,7 +6258,7 @@ then
                          then
          then
  
-         { "^[o^[c" pos @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" tpos @ cap "." who @ id_name "^[y, "
+         { "^[o^[c" position @ "."attacker @ id_name "^[y uses ^[c" move @ cap "^[y against ^[c" temp_position @ cap "." defender @ id_name "^[y, "
          typetotal @ 1 > if
          "its SUPER EFFECTIVE "
          then
@@ -6276,7 +6276,7 @@ then
          then
  
          "and deals ^[o^[r" damphrase @ 
-         debug @ if "^[c[Debug: " realdamage @ ": " damper @ "%" "BP: " basepower @ " CL: " chlev @ " "  shield @ if " shielded" then who @ "status/statmods/substitute" get if "Sub: " who @ "status/statmods/substitute" get then "]" then
+         debug @ if "^[c[Debug: " realdamage @ ": " damper @ "%" "BP: " basepower @ " CL: " chlev @ " "  shield @ if " shielded" then defender @ "status/statmods/substitute" get if "Sub: " defender @ "status/statmods/substitute" get then "]" then
  
          CH @ 1 > if
          "^[y CRITICAL"
@@ -6288,26 +6288,26 @@ then
                    move @ "Relic Song" smatch 
                    attacker @ "species" fget "648" smatch and if
                    POKESTORE { "@pokemon/" attacker @ fid "/@temp/species" }cat "648p" setprop
-                   { "^[o^[c" pos @ "." attacker @ id_name "^[y transforms into ^[c" POKEDEX { "pokemon/" attacker @ "species" fget "/Name" "^[y on ^[c" tpos @ "." who @ id_name "^[y and missed!" }Cat notify_watchers
+                   { "^[o^[c" position @ "." attacker @ id_name "^[y transforms into ^[c" POKEDEX { "pokemon/" attacker @ "species" fget "/Name" "^[y on ^[c" temp_position @ "." defender @ id_name "^[y and missed!" }Cat notify_watchers
           then
          
          (do justified)
-         who @ "ability" fget "Justified" smatch
-         who @ "status/statmods/substitute" get not and
+         defender @ "ability" fget "Justified" smatch
+         defender @ "status/statmods/substitute" get not and
          user @ { "moves/" move @ "/type" }cat get "dark" smatch and if
                 
-                    who @ "status/statmods/PhysAtk" get atoi 6 < if
-                         who @ "status/statmods/PhysAtk" over over get atoi 1 + setto
-                         { "^[o^[c" tpos @ "." who @ id_name "'s^[y ability ^[cJustified^[y activated!"  }cat notify_watchers
-                         { "^[o^[c" who @ id_name "'s ^[yPhysAtk raised!"  }cat notify_watchers
+                    defender @ "status/statmods/PhysAtk" get atoi 6 < if
+                         defender @ "status/statmods/PhysAtk" over over get atoi 1 + setto
+                         { "^[o^[c" temp_position @ "." defender @ id_name "'s^[y ability ^[cJustified^[y activated!"  }cat notify_watchers
+                         { "^[o^[c" defender @ id_name "'s ^[yPhysAtk raised!"  }cat notify_watchers
            then
          then
          (do cursed body)
-         who @ "ability" fget "cursed body" smatch 
-         who @ "status/statmods/substitute" get not and
+         defender @ "ability" fget "cursed body" smatch 
+         defender @ "status/statmods/substitute" get not and
          if
                 random 100 % 1 + 30 <= if
-                { "^[o^[c" who @ id_name "^[y's ^[cCursed Body ^[yhas now disabled the attack!" }cat notify_Watchers
+                { "^[o^[c" defender @ id_name "^[y's ^[cCursed Body ^[yhas now disabled the attack!" }cat notify_Watchers
                 attacker @ "status/statmods/disabled/turns" random 8 % 2 + setto
                 then
                 
@@ -6321,17 +6321,17 @@ then
                if
                 random 100 % 1 + user @ "ability" fget "Serene Grace" smatch if 20 else 10 then <= if
                  (you can only flinch someone if they haven't attacked yet)
-                 who @ "ability" fget "inner focus" smatch
+                 defender @ "ability" fget "inner focus" smatch
                  user @ moldbreaker
                  if
-                 { "^[o^[c" who @ id_name "^[y was protected from flinching by its ability ^[cInner Focus^[y!" }cat notify_watchers
+                 { "^[o^[c" defender @ id_name "^[y was protected from flinching by its ability ^[cInner Focus^[y!" }cat notify_watchers
                  else
                  
-                 loc @ { "@battle/" BID @ "/declare/finished/" tpos @ }cat getprop not who @ "status/hp" get atoi 0 > and 
-                 who @ "status/statmods/substitute" get not and
+                 loc @ { "@battle/" BID @ "/declare/finished/" temp_position @ }cat getprop not defender @ "status/hp" get atoi 0 > and 
+                 defender @ "status/statmods/substitute" get not and
                  if
-                 loc @ { "@battle/" BID @ "/flinched/" tpos @ }cat who @ setprop
-                 { "^[o^[c" who @ id_name "^[y flinched!" }cat notify_watchers
+                 loc @ { "@battle/" BID @ "/flinched/" temp_position @ }cat defender @ setprop
+                 { "^[o^[c" defender @ id_name "^[y flinched!" }cat notify_watchers
                  then
                  then
                  then
@@ -6354,31 +6354,31 @@ then
 then
 
         
-         loc @ { "@battle/" BID @ "/DamageDeltTurn/" pos @ }cat over over getprop damage @ + setprop
-         who @ "status/statmods/substitute" get 
-         who @ "ability" fget "Infiltrator" smatch not and
+         loc @ { "@battle/" BID @ "/DamageDeltTurn/" position @ }cat over over getprop damage @ + setprop
+         defender @ "status/statmods/substitute" get 
+         defender @ "ability" fget "Infiltrator" smatch not and
          if
          damage @ substitute_damage
          else
          damage @ if
-                loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" tpos @ }cat 1 setprop
-                who @ "ability" fget "illusion" smatch if 
-                        who @ "status/statmods/illusion/broken" get not if
-                                { "^[o^[c" who @ id_name "'s^[y illusion is broken!" }cat notify_watchers
-                                who @ "status/statmods/illusion/broken" 1 setto 
+                loc @ { "@battle/" BID @ "/tempvalues/HurtThisTurn/" temp_position @ }cat 1 setprop
+                defender @ "ability" fget "illusion" smatch if 
+                        defender @ "status/statmods/illusion/broken" get not if
+                                { "^[o^[c" defender @ id_name "'s^[y illusion is broken!" }cat notify_watchers
+                                defender @ "status/statmods/illusion/broken" 1 setto 
                         then
                 then
          then
-         who @ "status/hp" over over get atoi damage @ - setto
+         defender @ "status/hp" over over get atoi damage @ - setto
                         (enndure check)
-                  who @ "status/statmods/enduring" get
-                  who @ "status/hp" get atoi 1 = and if
-                  { "^[o^[c" who @ id_name "^[y has Endured the attack!" }cat notify_watchers then
+                  defender @ "status/statmods/enduring" get
+                  defender @ "status/hp" get atoi 1 = and if
+                  { "^[o^[c" defender @ id_name "^[y has Endured the attack!" }cat notify_watchers then
                   
                   (do splash damage)
                   POKEDEX { "moves/" move @ "/splashdamage" }cat getprop if
                          { -1 1 }list foreach swap pop temp3 !
-                         { tpos @ 1 1 midstr tpos @ 2 1 midstr atoi temp3 @ + }cat temp !
+                         { temp_position @ 1 1 midstr temp_position @ 2 1 midstr atoi temp3 @ + }cat temp !
                          loc @ { "@battle/" BID @ "/position/" temp @ }cat getprop temp2 !
                          
                          temp2 @ not if continue then
@@ -6394,18 +6394,18 @@ then
                          
          then
          
-         who @ "status/hp" get atoi 0 <= if
+         defender @ "status/hp" get atoi 0 <= if
          
          (Multiscale)
-         who @ "ability" fget "multiscale" smatch
+         defender @ "ability" fget "multiscale" smatch
          attacker @ moldbreaker 
          StartedFullHP @ and if
                 damage @ 2 / damage !
-                { "^[o^[c" who @ id_name "^[y has the ability ^[c" who @ "ability" fget cap "^[y and halved the attack!" }Cat notify_watchers
+                { "^[o^[c" defender @ id_name "^[y has the ability ^[c" defender @ "ability" fget cap "^[y and halved the attack!" }Cat notify_watchers
          then
          
                   (check for sturdy and set hp to 1 if it is)
-          who @ "ability" fget "sturdy" smatch
+          defender @ "ability" fget "sturdy" smatch
           attacker @ moldbreaker 
           StartedFullHP @ and
           
@@ -6413,50 +6413,50 @@ then
           POKEDEX { "moves/" move @ "/sethit" }cat getprop not and
           
           if
-          who @ "status/hp" 1 setto
-                  { "^[o^[c" who @ id_name "^[y has the ability ^[c" who @ "ability" fget cap "^[y and withstood the attack!" }Cat notify_watchers
+          defender @ "status/hp" 1 setto
+                  { "^[o^[c" defender @ id_name "^[y has the ability ^[c" defender @ "ability" fget cap "^[y and withstood the attack!" }Cat notify_watchers
             else      
-         who @ "holding" get "Focus Band" smatch frand 0.1 <= and tpos @ who @ can_use_hold_item and if
-         who @ "status/hp" 1 setto
-         who @ "holding" "Nothing" setto
-         { "^[o^[c" who @ id_name "^[y was protected from fainting by their ^[cFocus Band^[y!" }cat notify_watchers
+         defender @ "holding" get "Focus Band" smatch frand 0.1 <= and temp_position @ defender @ can_use_hold_item and if
+         defender @ "status/hp" 1 setto
+         defender @ "holding" "Nothing" setto
+         { "^[o^[c" defender @ id_name "^[y was protected from fainting by their ^[cFocus Band^[y!" }cat notify_watchers
          else
-         who @ "holding" get "Focus Sash" smatch StartedFullHP @ and tpos @ who @ can_use_hold_item and if
-         who @ "status/hp" 1 setto
-         who @ "holding" "Nothing" setto
-         { "^[o^[c" who @ id_name "^[y was protected from fainting by their ^[cFocus Sash^[y!" }cat notify_watchers
+         defender @ "holding" get "Focus Sash" smatch StartedFullHP @ and temp_position @ defender @ can_use_hold_item and if
+         defender @ "status/hp" 1 setto
+         defender @ "holding" "Nothing" setto
+         { "^[o^[c" defender @ id_name "^[y was protected from fainting by their ^[cFocus Sash^[y!" }cat notify_watchers
          else
-         POKESTORE { "@pokemon/" who @ "/@RP/status" }cat remove_prop
-         who @ "status/hp" 0 setto
-         who @ "status/fainted" 1 setto
-         loc @ { "@battle/" BID @ "/Declare/" tpos @ }cat remove_prop
+         POKESTORE { "@pokemon/" defender @ "/@RP/status" }cat remove_prop
+         defender @ "status/hp" 0 setto
+         defender @ "status/fainted" 1 setto
+         loc @ { "@battle/" BID @ "/Declare/" temp_position @ }cat remove_prop
          (break)
          then
          then
          then
         else
-        who @ "status/statmods/movecontinued/movename" get dup not if pop else "rage" smatch who @ "status/fainted" get not and if
-        who @ "status/statmods/PhysAtk" get atoi oldval !
-                    who @ "status/statmods/PhysAtk" over over get atoi 1 + temp !
+        defender @ "status/statmods/movecontinued/movename" get dup not if pop else "rage" smatch defender @ "status/fainted" get not and if
+        defender @ "status/statmods/PhysAtk" get atoi oldval !
+                    defender @ "status/statmods/PhysAtk" over over get atoi 1 + temp !
                     temp @ 6 > if 6 temp ! then
                     temp @ -6 < if -6 temp ! then
                     temp @ setto
                     {
                       oldval @ temp @ = if
-                      "^[o^[c" who @ id_name "'s ^[yPhysAtk can't go any higher from rage."
+                      "^[o^[c" defender @ id_name "'s ^[yPhysAtk can't go any higher from rage."
                       else
  
  
-                "^[o^[c" who @ id_name "'s ^[yPhysAtk raised from its rage."
+                "^[o^[c" defender @ id_name "'s ^[yPhysAtk raised from its rage."
                 then
         }cat notify_watchers
  
          then
  
-        who @ "ability" fget "Anger Point" smatch if
+        defender @ "ability" fget "Anger Point" smatch if
                 CH @ 1 > if
-                        who @ "status/statmods/PhysAtk" 6 setto
-                        { "^[o^[c" who @ id_name "'s^[y ability " who @ "ability" fget cap "^[y activated!" }cat notify_watchers
+                        defender @ "status/statmods/PhysAtk" 6 setto
+                        { "^[o^[c" defender @ id_name "'s^[y ability " defender @ "ability" fget cap "^[y activated!" }cat notify_watchers
                 then
         then
  
@@ -6470,7 +6470,7 @@ POKEDEX { "moves/" move @ "/FaintBeforeUse" }cat getprop  user @ "status/fainted
                     user @ "status/hp" 0 setto
                    user @ "status/fainted" 1 setto
                    (
-                   { "^[o^[c" pos @ cap "." user @ id_name " ^[yFainted!!" }cat notify_watchers
+                   { "^[o^[c" position @ cap "." user @ id_name " ^[yFainted!!" }cat notify_watchers
                                    user @ "happiness" over over fget atoi 1 - fsetto
                 user @ "happiness" over over fget atoi 0 < if 0 fsetto else pop pop then)
  
@@ -6478,18 +6478,18 @@ POKEDEX { "moves/" move @ "/FaintBeforeUse" }cat getprop  user @ "status/fainted
 
 then
  
-who @ "status/fainted" get not user @ "status/fainted" get not and if
+defender @ "status/fainted" get not user @ "status/fainted" get not and if
  
-        POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
+        POKEDEX { "items/" defender @ "holding" get "/holdeffect" }cat getprop berryeffect !
         berryeffect @
-        tpos @ who @ can_use_hold_item and
+        temp_position @ defender @ can_use_hold_item and
         user @ "ability" fget "Magic Guard" smatch not and
         if
                 berryeffect @ ":" explode_array foreach effect ! pop
                 effect @ "recoil*" smatch if
                         effect @ " " "Recoil" subst strip effect !
                         POKEDEX  { "moves/" move @ "/class" }cat getprop effect @ smatch if
-                                { "^[o^[c" who @ id_name "^[y ate its ^[c" who @ "holding" get "^[y and caused damage to ^[c" user @ id_name "^y!" }cat notify_watchers
+                                { "^[o^[c" defender @ id_name "^[y ate its ^[c" defender @ "holding" get "^[y and caused damage to ^[c" user @ id_name "^y!" }cat notify_watchers
                                 user @ "status/hp" over over get atoi
                                 user @ "maxhp" calculate 8 user @ "pvp/hpboost" fget dup if atoi * else pop then divdamage - setto
  
@@ -6497,7 +6497,7 @@ who @ "status/fainted" get not user @ "status/fainted" get not and if
                                 user @ "status/hp" 0 setto
                                 user @ "status/fainted" 1 setto
                                 then
-                                who @ eatberry
+                                defender @ eatberry
                         then
                 then
                 repeat
@@ -6507,7 +6507,7 @@ then
 repeat (this is for multi hit)
  
 hittimes @ 1 > if
-        { "^[o^[c" pos @ "."attacker @ id_name "^[y hit ^[c" turncount @ "^[y time[s]!" }cat notify_watchers
+        { "^[o^[c" position @ "."attacker @ id_name "^[y hit ^[c" turncount @ "^[y time[s]!" }cat notify_watchers
 then
  
 then
@@ -6518,21 +6518,21 @@ repeat (this is for triple kick)
  
 (store data of last hit)
  
-tpos @ stringify pos @ stringify smatch not if
-loc @ { "@battle/" BID @ "/lasthit/" tpos @ "/damage" }cat damage @ setprop
-loc @ { "@battle/" BID @ "/lasthit/" tpos @ "/class" }cat POKEDEX { "moves/" move @ "/class" }Cat getprop setprop
-loc @ { "@battle/" BID @ "/lasthit/" tpos @ "/target" }cat pos @ setprop
-loc @ { "@battle/" BID @ "/lasthit/" tpos @ "/type" }cat POKEDEX { "moves/" move @ "/type" }cat getprop setprop
+temp_position @ stringify position @ stringify smatch not if
+loc @ { "@battle/" BID @ "/lasthit/" temp_position @ "/damage" }cat damage @ setprop
+loc @ { "@battle/" BID @ "/lasthit/" temp_position @ "/class" }cat POKEDEX { "moves/" move @ "/class" }Cat getprop setprop
+loc @ { "@battle/" BID @ "/lasthit/" temp_position @ "/target" }cat position @ setprop
+loc @ { "@battle/" BID @ "/lasthit/" temp_position @ "/type" }cat POKEDEX { "moves/" move @ "/type" }cat getprop setprop
 then
  
 (do color change)
-who @ "ability" fget "Color Change" smatch if
-        who @ "status/statmods/type" movetype @ setto
-        { "^[o^[c" who @ id_name "^[y changed its type to ^[c" movetype @ cap "^[y because of its ability ^[cColor Change^[y." }cat notify_watchers
+defender @ "ability" fget "Color Change" smatch if
+        defender @ "status/statmods/type" movetype @ setto
+        { "^[o^[c" defender @ id_name "^[y changed its type to ^[c" movetype @ cap "^[y because of its ability ^[cColor Change^[y." }cat notify_watchers
 then
  
-loc @ { "@Battle/" BID @ "/bide/" tpos @ }cat getprop if
-        loc @ { "@Battle/" BID @ "/bide/" tpos @ "/damage" }cat over over getprop damage @ + setprop
+loc @ { "@Battle/" BID @ "/bide/" temp_position @ }cat getprop if
+        loc @ { "@Battle/" BID @ "/bide/" temp_position @ "/damage" }cat over over getprop damage @ + setprop
 then
 (effects)
  
@@ -6542,7 +6542,7 @@ else
  
  
  
-loc @ { "@battle/" BID @ "/beatup/" pos @ }cat getprop not
+loc @ { "@battle/" BID @ "/beatup/" position @ }cat getprop not
 if
  
 typetotal @
@@ -6555,15 +6555,15 @@ then
 then then
 
 (Weak Armor)
-POKEDEX { "moves/" move @ "/class" }cat getprop "physical" smatch who @ "ability" fget "weak armor" smatch and if
-        { "^[o^[c" who @ id_name "'s^[y ^[cSpeed ^[ywas raised while its ^[cDefense ^[ywas lowered due to ^[yits ability ^[c" who @ "ability" fget cap "^[y!" }cat notify_watchers
-        who @ "status/statmods/physdef" over over get atoi 1 - setto
-        who @ "status/statmods/physdef" get atoi -6 < if
-                who @ "status/statmods/physdef" -6 setto
+POKEDEX { "moves/" move @ "/class" }cat getprop "physical" smatch defender @ "ability" fget "weak armor" smatch and if
+        { "^[o^[c" defender @ id_name "'s^[y ^[cSpeed ^[ywas raised while its ^[cDefense ^[ywas lowered due to ^[yits ability ^[c" defender @ "ability" fget cap "^[y!" }cat notify_watchers
+        defender @ "status/statmods/physdef" over over get atoi 1 - setto
+        defender @ "status/statmods/physdef" get atoi -6 < if
+                defender @ "status/statmods/physdef" -6 setto
         then
-        who @ "status/statmods/speed" over over get atoi 1 + setto
-                who @ "status/statmods/speed" get atoi 6 > if
-                        who @ "status/statmods/speed" 6 setto
+        defender @ "status/statmods/speed" over over get atoi 1 + setto
+                defender @ "status/statmods/speed" get atoi 6 > if
+                        defender @ "status/statmods/speed" 6 setto
                 then
         
 then
@@ -6572,19 +6572,19 @@ POKEDEX { "moves/" move @ "/contact?" }cat getprop stringify "yes" smatch
 misshurtself @ not and
 if
  
-who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" smatch not and if
+defender @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" smatch not and if
                 
                         user @ "status/hp" over over get atoi user @ "maxhp" calculate 8 user @ "pvp/hpboost" fget dup if atoi * else pop then divdamage - setto
-                        { "^[o^[c" user @ id_name "^[y has been ^[rDamaged^[y by ^[c" who @ id_name "'s^[y item ^[c" who @ "holding" get "^[y!" }cat notify_watchers
+                        { "^[o^[c" user @ id_name "^[y has been ^[rDamaged^[y by ^[c" defender @ id_name "'s^[y item ^[c" defender @ "holding" get "^[y!" }cat notify_watchers
                         
                         user @ "holding" get "nothing" smatch if
                         POKESTORE { "@pokemon/" user @ "/@long/holding" }cat "Sticky Barb" setprop
-                        POKESTORE { "@pokemon/" who @ "/@long/holding" }cat "Nothing" setprop
+                        POKESTORE { "@pokemon/" defender @ "/@long/holding" }cat "Nothing" setprop
                         { "^[o^[c" user @ "holding" get "^[y is now stuck on ^[c" user @ id_name "^[y!"  }cat notify_watchers
                         then
                 then
  var oppability
- who @ "Ability" fget oppability !
+ defender @ "Ability" fget oppability !
  var ability
  user @ "ability" fget ability !
  
@@ -6592,19 +6592,19 @@ who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" sma
  ability @ "Poison Touch" smatch oppability @ "shield dust" smatch not and if
          frand 0.3 <= if
          begin
-            who @ "status/frozen"    get if break then
-            who @ "status/paralyzed" get if break then
-            who @ "status/asleep"    get if break then
-            who @ "status/poisoned"  get if break then
-            who @ "status/toxic"     get if break then
-            who @ "status/burned"    get if break then
-            who @ "status/fainted"   get if break then
-            who @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and if break then
-            who @ typelist "poison" array_findval array_count if break then
-            who @ typelist "steel" array_findval array_count if break then
-            who @ "ability" fget "immunity" smatch if break then
-           who @ "status/poisoned" 1 setto
-               { "^[o^[c" who @ id_name "^[y has been ^[ypoisoned^[y by ^[c" user @ id_name "^[y because of its ability ^[c" ability @ cap "^[y!" }cat notify_watchers
+            defender @ "status/frozen"    get if break then
+            defender @ "status/paralyzed" get if break then
+            defender @ "status/asleep"    get if break then
+            defender @ "status/poisoned"  get if break then
+            defender @ "status/toxic"     get if break then
+            defender @ "status/burned"    get if break then
+            defender @ "status/fainted"   get if break then
+            defender @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and if break then
+            defender @ typelist "poison" array_findval array_count if break then
+            defender @ typelist "steel" array_findval array_count if break then
+            defender @ "ability" fget "immunity" smatch if break then
+           defender @ "status/poisoned" 1 setto
+               { "^[o^[c" defender @ id_name "^[y has been ^[ypoisoned^[y by ^[c" user @ id_name "^[y because of its ability ^[c" ability @ cap "^[y!" }cat notify_watchers
                break
                repeat
          then
@@ -6622,7 +6622,7 @@ who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" sma
  oppability @ "Rough Skin" smatch 
  oppability @ "iron barbs" smatch or
  if
-        { "^[o^[c" user @ id_name "^[y takes damage because of ^[c" who @ id_name "'s ^[yability ^[c" who @ "ability" fget cap "^[y!" }cat notify_watchers
+        { "^[o^[c" user @ id_name "^[y takes damage because of ^[c" defender @ id_name "'s ^[yability ^[c" defender @ "ability" fget cap "^[y!" }cat notify_watchers
         user @ "status/hp" over over get atoi user @ "maxhp" calculate 16 user @ "pvp/hpboost" fget dup if atoi * else pop then divdamage - setto
         user @ "status/hp" get atoi 0 <= if
            POKESTORE { "@pokemon/" user @ "/@RP/status" }cat remove_prop
@@ -6642,11 +6642,11 @@ who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" sma
    user @ "status/toxic"     get if break then
    user @ "status/burned"    get if break then
    user @ "status/fainted"   get if break then
-   user @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and if break then
+   user @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and if break then
    user @ "ability" fget "water veil" smatch if break then
    user @ typelist "fire" array_findval array_count if break then
    user @ "status/burned" 1 setto
-   { "^[o^[c" user @ id_name "^[y has been ^[rBurned^[y by ^[c" who @ id_name " ^[ybecause of its ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
+   { "^[o^[c" user @ id_name "^[y has been ^[rBurned^[y by ^[c" defender @ id_name " ^[ybecause of its ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
  
   then
   oppability @ "Static" smatch if
@@ -6657,10 +6657,10 @@ who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" sma
    user @ "status/toxic"     get if break then
    user @ "status/burned"    get if break then
    user @ "status/fainted"   get if break then
-   user @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and if break then
+   user @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and if break then
    user @ "ability" fget "limber" smatch if break then
    user @ "status/paralyzed" 1 setto
-   { "^[o^[c" user @ id_name "^[y has been ^[yparalyzed^[y by ^[c" who @ id_name "^[y because of its ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
+   { "^[o^[c" user @ id_name "^[y has been ^[yparalyzed^[y by ^[c" defender @ id_name "^[y because of its ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
  
   then
   oppability @ "Poison Point" smatch if
@@ -6671,12 +6671,12 @@ who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" sma
    user @ "status/toxic"     get if break then
    user @ "status/burned"    get if break then
    user @ "status/fainted"   get if break then
-   user @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and if break then
+   user @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and if break then
    user @ typelist "poison" array_findval array_count if break then
    user @ typelist "steel" array_findval array_count if break then
    user @ "ability" fget "immunity" smatch if break then
    user @ "status/poisoned" 1 setto
-   { "^[o^[c" user @ id_name "^[y has been ^[mPoisoned^[y by ^[c" who @ id_name "^[y because of its ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
+   { "^[o^[c" user @ id_name "^[y has been ^[mPoisoned^[y by ^[c" defender @ id_name "^[y because of its ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
  
  
   then
@@ -6684,24 +6684,24 @@ who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" sma
   oppability @ "Cute Charm" smatch if
  
    user @ "status/statmods/attracted" get if break then
-     who @ "gender" fget "male" smatch if
+     defender @ "gender" fget "male" smatch if
        user @ "gender" fget "female" smatch if
        1 tempeffect !
        then then
-     who @ "gender" fget "female" smatch if
+     defender @ "gender" fget "female" smatch if
        user @ "gender" fget "male" smatch if
        1 tempeffect !
        then then
  
      tempeffect @ if
      user @ "ability" fget "oblivious" smatch not if
-     user @ "status/statmods/attracted" who @ setto
+     user @ "status/statmods/attracted" defender @ setto
  
-     { "^[o^[c"user @ id_name "^[y is now attracted because of ^[c" who @ id_name "'s^[y ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
+     { "^[o^[c"user @ id_name "^[y is now attracted because of ^[c" defender @ id_name "'s^[y ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
      
      user @ "holding" get "Destiny Knot" smatch if
-     who @ "status/statmods/attracted" user @ setto
-     { "^[o^[c"who @ id_name "^[y is now attracted because of ^[c" user @ id_name "'s^[y item ^[c" user @ "holding" get @ cap "^[y!" }cat notify_watchers
+     defender @ "status/statmods/attracted" user @ setto
+     { "^[o^[c"defender @ id_name "^[y is now attracted because of ^[c" user @ id_name "'s^[y item ^[c" user @ "holding" get @ cap "^[y!" }cat notify_watchers
      then
      
      then
@@ -6714,7 +6714,7 @@ who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" sma
      user @ "status/poisoned"  get if break then
      user @ "status/toxic"     get if break then
      user @ "status/burned"    get if break then
-     user @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and if break then
+     user @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and if break then
      user @ "status/fainted"   get if break then
   var effectspore
    randomchance @ 0.3 <= if
@@ -6735,27 +6735,27 @@ who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" sma
    user @ "ability" fget "immunity" smatch and
    if
    user @ "status/poisoned" 1 setto
-   { "^[o^[c" user @ id_name "^[y has been ^[mPoisoned^[y by ^[c" who @ id_name "^[y because of its ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
+   { "^[o^[c" user @ id_name "^[y has been ^[mPoisoned^[y by ^[c" defender @ id_name "^[y because of its ability ^[c" oppability @ cap "^[y!" }cat notify_watchers
    then
    effectspore @ "paralyze" smatch
    user @ "ability" fget "limber" smatch not and
    if
    user @ "status/paralyzed" 1 setto
-   { "^[o^[c" user @ id_name "^[y has been ^[yParalyzed^[y by ^[c" who @ id_name "^[y because of its ability ^[c"oppability @ cap "^[y!" }cat notify_watchers
+   { "^[o^[c" user @ id_name "^[y has been ^[yParalyzed^[y by ^[c" defender @ id_name "^[y because of its ability ^[c"oppability @ cap "^[y!" }cat notify_watchers
    then
    effectspore @ "sleep" smatch if
         user @ "ability" fget "Vital Spirit" smatch
         user @ "ability" fget "Insomnia" smatch or
         if
-           { "^[o^[c" user @ id_name "^[y would have fallen ^[bAsleep^[y because of ^[c" who @ id_name "'s ^[yability ^[c"oppability @ cap "^[y but couldn't due to its ability ^[c" user @ "ability" fget cap "^[y!" }cat notify_watchers
+           { "^[o^[c" user @ id_name "^[y would have fallen ^[bAsleep^[y because of ^[c" defender @ id_name "'s ^[yability ^[c"oppability @ cap "^[y but couldn't due to its ability ^[c" user @ "ability" fget cap "^[y!" }cat notify_watchers
         else
            loc @ { "@battle/" BID @ "/uproar" }cat propdir? if
-           { "^[o^[c" user @ id_name "^[y would have fallen ^[bAsleep^[y because of ^[c" who @ id_name "'s ^[yability ^[c"oppability @ cap "^[y but couldn't due to the effect of uproar!" }cat notify_watchers
+           { "^[o^[c" user @ id_name "^[y would have fallen ^[bAsleep^[y because of ^[c" defender @ id_name "'s ^[yability ^[c"oppability @ cap "^[y but couldn't due to the effect of uproar!" }cat notify_watchers
            else
                    user @ "status/asleep" random 7 % 2 +
                    user @ "ability" fget "early bird" smatch if dup 2 / - then
                    setto
-                   { "^[o^[c" user @ id_name "^[y is now ^[bAsleep^[y because of ^[c" who @ id_name "'s ^[yability ^[c"oppability @ cap "^[y!" }cat notify_watchers
+                   { "^[o^[c" user @ id_name "^[y is now ^[bAsleep^[y because of ^[c" defender @ id_name "'s ^[yability ^[c"oppability @ cap "^[y!" }cat notify_watchers
            then
         then
    then
@@ -6766,26 +6766,26 @@ who @ "holding" get "Sticky Barb" smatch user @ "ability" fget "Magic Guard" sma
  then
 then
  
-who @ "status/fainted" get if
+defender @ "status/fainted" get if
  
         (moved the happiness change to the endbattle.muf)
-         { "^[o^[c" tpos @ cap "." who @ id_name " ^[yFainted!!" }cat notify_watchers
+         { "^[o^[c" temp_position @ cap "." defender @ id_name " ^[yFainted!!" }cat notify_watchers
          
          user @ "ability" fget "moxie" smatch if
                          user @ "status/statmods/PhysAtk" get atoi 6 < if
                                  user @ "status/statmods/PhysAtk" over over get atoi 1 + setto
-                                 { "^[o^[c" pos @ cap "." user @ id_name "'s ^[y^[cPsysAtk ^[ystat raised from its ability ^[cMoxie^[y!" }cat notify_watchers
+                                 { "^[o^[c" position @ cap "." user @ id_name "'s ^[y^[cPsysAtk ^[ystat raised from its ability ^[cMoxie^[y!" }cat notify_watchers
                          then
          then
          
-         who @ "ability" fget "Aftermath" smatch
+         defender @ "ability" fget "Aftermath" smatch
          POKEDEX { "moves/" move @ "/contact?" }cat getprop stringify "yes" smatch and if
-                "Damp" bid @ onfield_ability if
-                { "^[o^[c" attacker @ id_name "^[y tried to use its ability ^[cAftermath^[y but it failed due to ^[cDamp ^[yability on field." }cat bid @ notify_watchers
+                "Damp" BID @ onfield_ability if
+                { "^[o^[c" attacker @ id_name "^[y tried to use its ability ^[cAftermath^[y but it failed due to ^[cDamp ^[yability on field." }cat BID @ notify_watchers
                 else
                  user @ "status/hp" over over get atoi
                  user @ "maxhp" calculate 4 user @ "pvp/hpboost" fget dup if atoi * else pop then divdamage - setto
-                 { "^[o^[c" pos @ cap "." user @ id_name " ^[ytook damage from ^[cAftermath ^[yability!" }cat notify_watchers
+                 { "^[o^[c" position @ cap "." user @ id_name " ^[ytook damage from ^[cAftermath ^[yability!" }cat notify_watchers
                  user @ "status/hp" get atoi 0 <= if
                         user @ "status/hp" 0 setto
                         user @ "status/fainted" 1 setto
@@ -6798,32 +6798,32 @@ who @ "status/fainted" get if
          
  then
  
- loc @ { "@battle/" BID @ "/grudge/" who @ }cat getprop if
+ loc @ { "@battle/" BID @ "/grudge/" defender @ }cat getprop if
  user @ { "/movesknown/" move @ "/pp" }cat 1 fsetto
- { "^[o^[c" pos @ cap "." user @ id_name " ^[yran out of PP in ^[c" move @ cap "^[y because of ^[c" tpos @ "." who @ id_name "'s^[y grudge!!" }cat notify_watchers
+ { "^[o^[c" position @ cap "." user @ id_name " ^[yran out of PP in ^[c" move @ cap "^[y because of ^[c" temp_position @ "." defender @ id_name "'s^[y grudge!!" }cat notify_watchers
  then
  
- loc @ { "@battle/" BID @ "/destinybond/" who @ }cat getprop if
+ loc @ { "@battle/" BID @ "/destinybond/" defender @ }cat getprop if
  POKESTORE { "@pokemon/" user @ "/@RP/status/" }Cat remove_prop
  user @ "status/fainted" 1 setto
  user @ "status/hp" 0 setto
- { "^[o^[c" pos @ cap "." user @ id_name " ^[yFainted Because of Destiny Bond!!" }cat notify_watchers
+ { "^[o^[c" position @ cap "." user @ id_name " ^[yFainted Because of Destiny Bond!!" }cat notify_watchers
  then
 then
  
  
 (have berries that remove status effect go into place here, do this for both sides)
-who @ "status/fainted" get not if
-        POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
+defender @ "status/fainted" get not if
+        POKEDEX { "items/" defender @ "holding" get "/holdeffect" }cat getprop berryeffect !
         berryeffect @
-        tpos @ who @ can_use_hold_item and if
+        temp_position @ defender @ can_use_hold_item and if
                 berryeffect @ ":" explode_array foreach effect ! pop
                 effect @ "Heal*" smatch if
                         effect @ " " "Heal" subst strip effect !
-                        who @ { "status/" effect @ }cat get if
-                                who @ { "status/" effect @ }cat 0 setto
-                                { "^[o^[c" who @ id_name "^[y was healed from being ^[c" effect @ "^[y by eating its ^[c" who @ "holding" get "^[y!" }cat notify_watchers
-                                who @ eatberry
+                        defender @ { "status/" effect @ }cat get if
+                                defender @ { "status/" effect @ }cat 0 setto
+                                { "^[o^[c" defender @ id_name "^[y was healed from being ^[c" effect @ "^[y by eating its ^[c" defender @ "holding" get "^[y!" }cat notify_watchers
+                                defender @ eatberry
                         then
  
                 then
@@ -6834,7 +6834,7 @@ then
 user @ "status/fainted" get not if
         POKEDEX { "items/" user @ "holding" get "/holdeffect" }cat getprop berryeffect !
         berryeffect @
-        pos @ user @ can_use_hold_item and if
+        position @ user @ can_use_hold_item and if
                 berryeffect @ ":" explode_array foreach effect ! pop
                 effect @ "Heal*" smatch if
                         effect @ " " "Heal" subst strip effect !
@@ -6849,57 +6849,57 @@ user @ "status/fainted" get not if
         then
 then
  
-who @ "status/hp" get atoi who @ "maxhp" calculate 0.5 * <=
-who @ "status/fainted" get not and if
-        POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
+defender @ "status/hp" get atoi defender @ "maxhp" calculate 0.5 * <=
+defender @ "status/fainted" get not and if
+        POKEDEX { "items/" defender @ "holding" get "/holdeffect" }cat getprop berryeffect !
                 berryeffect @
-                tpos @ who @ can_use_hold_item and if
+                temp_position @ defender @ can_use_hold_item and if
                         berryeffect @ ":" explode_array foreach effect ! pop
  
                                         effect @ "Restore/*" smatch if
-                                        POKEDEX { "items/" who @ "holding" get "/conditional" }cat getprop if continue then
+                                        POKEDEX { "items/" defender @ "holding" get "/conditional" }cat getprop if continue then
                                                 effect @ " " "Restore/" subst strip atoi effect !
-                                                who @ "status/hp" over over get atoi who @ "maxhp" calculate effect @ who @ "pvp/hpboost" fget dup if atoi * else pop then / + setto
-                                                { "^[o^[c" who @ id_name "^[y regained some health by eating its ^[c" who @ "holding" get "^[y!" }cat notify_watchers
-                                                who @ eatberry
+                                                defender @ "status/hp" over over get atoi defender @ "maxhp" calculate effect @ defender @ "pvp/hpboost" fget dup if atoi * else pop then / + setto
+                                                { "^[o^[c" defender @ id_name "^[y regained some health by eating its ^[c" defender @ "holding" get "^[y!" }cat notify_watchers
+                                                defender @ eatberry
  
                                                 continue
                                         then
                                         effect @ "Restore *" smatch if
-                                                POKEDEX { "items/" who @ "holding" get "/conditional" }cat getprop if continue then
+                                                POKEDEX { "items/" defender @ "holding" get "/conditional" }cat getprop if continue then
                                                 effect @ " " "Restore" subst strip atoi effect !
-                                                who @ "status/hp" over over get atoi effect @ + setto
-                                                { "^[o^[c" who @ id_name "^[y regained some health by eating its ^[c" who @ "holding" get "^[y!" }cat notify_watchers
-                                                who @ eatberry
+                                                defender @ "status/hp" over over get atoi effect @ + setto
+                                                { "^[o^[c" defender @ id_name "^[y regained some health by eating its ^[c" defender @ "holding" get "^[y!" }cat notify_watchers
+                                                defender @ eatberry
                                         continue
                                         then
                                         effect @ "confused" smatch if
  
-                                                POKEDEX { "items/" who @ "holding" get "/" POKEDEX { "natures/" who @ "nature" get "/dislikes" }cat getprop }cat getprop if
-                                                who @ "ability" fget "Own Tempo" smatch if
-                                                { "^[o^[c" who @ id_name "^[y would of been confused, but can't be due to its ability ^[cOwn Tempo^[y." }cat notify_watchers
+                                                POKEDEX { "items/" defender @ "holding" get "/" POKEDEX { "natures/" defender @ "nature" get "/dislikes" }cat getprop }cat getprop if
+                                                defender @ "ability" fget "Own Tempo" smatch if
+                                                { "^[o^[c" defender @ id_name "^[y would of been confused, but can't be due to its ability ^[cOwn Tempo^[y." }cat notify_watchers
                                                 continue then
-                                                { "^[o^[c" who @ id_name "^[y is now confused!" }cat notify_watchers
-                                                       who @ "status/statmods/confused"  random 4 % 2 + setto
+                                                { "^[o^[c" defender @ id_name "^[y is now confused!" }cat notify_watchers
+                                                       defender @ "status/statmods/confused"  random 4 % 2 + setto
                                                 then
                                         then
                         repeat
                 then
 then
  
-POKEDEX { "items/" who @ "holding" get "/Conditional" }cat getprop stringify "supereffective" smatch
-who @ "status/fainted" get not and
+POKEDEX { "items/" defender @ "holding" get "/Conditional" }cat getprop stringify "supereffective" smatch
+defender @ "status/fainted" get not and
 if
-        POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
+        POKEDEX { "items/" defender @ "holding" get "/holdeffect" }cat getprop berryeffect !
                 berryeffect @
-                tpos @ who @ can_use_hold_item and if
+                temp_position @ defender @ can_use_hold_item and if
                         berryeffect @ ":" explode_array foreach effect ! pop
                                         effect @ "Restore*" smatch if
-                                        (POKEDEX { "items/" who @ "holding" get "/conditional" }cat getprop if continue then) (I don't know why this was here)
+                                        (POKEDEX { "items/" defender @ "holding" get "/conditional" }cat getprop if continue then) (I don't know why this was here)
                                                 effect @ " " "Restore" subst strip atoi effect !
-                                                who @ "status/hp" over over get atoi who @ "maxhp" calculate effect @ / + setto
-                                                { "^[o^[c" who @ id_name "^[y regained some health by eating its ^[c" who @ "holding" get "^[y!" }cat notify_watchers
-                                                who @ eatberry
+                                                defender @ "status/hp" over over get atoi defender @ "maxhp" calculate effect @ / + setto
+                                                { "^[o^[c" defender @ id_name "^[y regained some health by eating its ^[c" defender @ "holding" get "^[y!" }cat notify_watchers
+                                                defender @ eatberry
  
                                                 continue
                                         then
@@ -6907,21 +6907,21 @@ if
                         then
 then
  
-who @ "ability" fget "Gluttony" smatch if
-who @ "status/hp" get atoi who @ "maxhp" calculate 0.50 * <=
+defender @ "ability" fget "Gluttony" smatch if
+defender @ "status/hp" get atoi defender @ "maxhp" calculate 0.50 * <=
 else
-who @ "status/hp" get atoi who @ "maxhp" calculate 0.25 * <=
+defender @ "status/hp" get atoi defender @ "maxhp" calculate 0.25 * <=
 then
-who @ "status/fainted" get not and if
-POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
+defender @ "status/fainted" get not and if
+POKEDEX { "items/" defender @ "holding" get "/holdeffect" }cat getprop berryeffect !
                 berryeffect @
-                tpos @ who @ can_use_hold_item and if
+                temp_position @ defender @ can_use_hold_item and if
                         berryeffect @ ":" explode_array foreach effect ! pop
  
                         effect @ "move first" smatch if
-                                 { "^[o^[c" who @ id_name "^[y is attacking sooner next turn by eating its ^[c" who @ "holding" get "^[y!" }cat notify_watchers
-                                 who @ "status/statmods/movefirst" 1 setto
-                                 who @ eatberry
+                                 { "^[o^[c" defender @ id_name "^[y is attacking sooner next turn by eating its ^[c" defender @ "holding" get "^[y!" }cat notify_watchers
+                                 defender @ "status/statmods/movefirst" 1 setto
+                                 defender @ eatberry
                                  continue
                         then
  
@@ -6937,9 +6937,9 @@ POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
                             5 = if "Speed"   effect ! then
                         then
                         effect @ "critical*" smatch if "critical" effect ! then
-                        who @ { "status/statmods/" effect @ }cat over over get atoi 1 + setto
-                        { "^[o^[c" who @ id_name "^[y raised its ^[c" effect @ "^[y stat by eating its ^[c" who @ "holding" get "^[y!" }cat notify_watchers
-                        who @ eatberry
+                        defender @ { "status/statmods/" effect @ }cat over over get atoi 1 + setto
+                        { "^[o^[c" defender @ id_name "^[y raised its ^[c" effect @ "^[y stat by eating its ^[c" defender @ "holding" get "^[y!" }cat notify_watchers
+                        defender @ eatberry
                         continue
         then
         repeat
@@ -6949,29 +6949,29 @@ POKEDEX { "items/" who @ "holding" get "/holdeffect" }cat getprop berryeffect !
 then
  
 majorstatus @ not
-who @ check_status and
-who @ "ability" fget "Synchronize" smatch and
+defender @ check_status and
+defender @ "ability" fget "Synchronize" smatch and
 user @ check_status not and
-user @ "ability" fget "leaf guard" smatch bid @ check_weather "sunny day" smatch and if 0 else 1 then and
+user @ "ability" fget "leaf guard" smatch BID @ check_weather "sunny day" smatch and if 0 else 1 then and
 if
-        who @ "status/poisoned" get
-        who @ "Status/toxic" get or
+        defender @ "status/poisoned" get
+        defender @ "Status/toxic" get or
         user @ typelist "poison" array_findval array_count if 0 else 1 then and
         user @ typelist "steel" array_findval array_count if 0 else 1 then and
         if
-                (who @ "status/poisoned" get if)
+                (defender @ "status/poisoned" get if)
                 user @ "status/poisoned" 1 setto
                 { "^[o^[c" user @ id_name "^[y was ^[mpoisoned ^[ydue to the effects of Synchronize!" }cat notify_watchers
                 (then)
                 ( this is for generation V)
                 (
-                who @ "status/toxic" get if
+                defender @ "status/toxic" get if
                 user @ "status/toxic" 1 setto
                 { "^[o^[c" user @ id_name "^[y was ^[mbadly poisoned ^[ydue to the effects of Synchronize!" }cat notify_watchers
                 then )
         then
  
-        who @ "status/burned" get
+        defender @ "status/burned" get
  
         user @ typelist "fire" array_findval array_count if 0 else 1 then and
         if
@@ -6979,7 +6979,7 @@ if
                 { "^[o^[c" user @ id_name "^[y was ^[rburned ^[ydue to the effects of Synchronize!" }cat notify_watchers
         then
  
-        who @ "status/paralyzed" get
+        defender @ "status/paralyzed" get
         user @ "ability" fget "limber" smatch if 0 else 1 then and
         if
                 user @ "status/paralyzed" 1 setto
