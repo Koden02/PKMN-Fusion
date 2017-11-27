@@ -2165,7 +2165,7 @@ var pos
                 break
                 then
                 attacker @  "status/statmods/healblock" get if
-                POKEDEX { "moves/" move @ "effects" }cat getprop stringify "*cure*"  smatch if
+                POKEDEX { "moves/" move @ "/effects" }cat getprop stringify "*cure*"  smatch if
                 { "^[o^[c" attacker @ id_name "^[y tried to use ^[c" move @ cap "^[y but it was heal blocked." }cat bid @ notify_watchers
                 break
                 then
