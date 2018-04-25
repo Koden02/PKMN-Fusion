@@ -13,6 +13,7 @@ who !
  
 who @ "@rp/ID" getprop not if "^[o^[rPlayer not chargen'd!" tellme exit then
 who @ "@valid?/AUP" getprop not if "^[o^[rPlayer needs to agree to the AUP first!" tellme exit then
+who @ "@valid?/when" getprop if "^[o^[rPlayer is already valid!" tellme exit then
 who @ "@prevalid/e-mail" getprop dup if email ! else pop 
 "^[o^[yEmail? ^[r(.abort to cancel)" tellme
 read dup ".abort" smatch if pop "^[rCanceled" tellme exit then email !
@@ -52,5 +53,5 @@ who @ "^[o^[gYou've been validated!" notify
 who @ "^[o^[gHere!  Have some Poke Balls and Potions to start you off! ^[w[^[gReceived 10 poke balls and 5 potions^[w]" notify
 who @ "^[o^[gOh! And before you go, take this trainer set.  It includes one of each power item, an everstone, and a lucky egg.  You gotta find more though." notify
 who @ "^[o^[w[^[gRecieved a Power Anklet, a Power Band, a Power Belt, a Power Bracer, a Power Lens, a Power Weight, an Everstone, and a Lucky Egg^[w]" notify
-who @ "^[o^[gYou feel inspired! ^[w[^[gYou now have 1000 tp^[w]" notify
+(who @ "^[o^[gYou feel inspired! ^[w[^[gYou now have 1000 tp^[w]" notify)
 ;
