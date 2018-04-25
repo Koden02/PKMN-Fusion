@@ -29,6 +29,14 @@ who @ "@rp/ID" getprop ID !
 POKESTORE { "@pokemon/" id @ "/@RP/tp" }cat 1000 setprop
 POKESTORE { "@pokemon/" id @ "/@RP/inventory/Poke Ball" }cat 10 setprop
 POKESTORE { "@pokemon/" id @ "/@RP/inventory/Potion" }cat 5 setprop
+POKESTORE { "@pokemon/" id @ "/@RP/inventory/power anklet" }cat 1 setprop
+POKESTORE { "@pokemon/" id @ "/@RP/inventory/power band" }cat 1 setprop
+POKESTORE { "@pokemon/" id @ "/@RP/inventory/power belt" }cat 1 setprop
+POKESTORE { "@pokemon/" id @ "/@RP/inventory/power bracer" }cat 1 setprop
+POKESTORE { "@pokemon/" id @ "/@RP/inventory/power lens" }cat 1 setprop
+POKESTORE { "@pokemon/" id @ "/@RP/inventory/power weight" }cat 1 setprop
+POKESTORE { "@pokemon/" id @ "/@RP/inventory/Everstone" }cat 1 setprop
+POKESTORE { "@pokemon/" id @ "/@RP/inventory/Lucky Egg" }cat 1 setprop
  
   var listener
   { online pop }list foreach listener ! pop
@@ -43,5 +51,7 @@ POKESTORE { "@pokemon/" id @ "/@RP/inventory/Potion" }cat 5 setprop
 "^[o^[gDone!" tellme
 who @ "^[o^[gYou've been validated!" notify
 who @ "^[o^[gHere!  Have some Poke Balls and Potions to start you off! ^[w[^[gReceived 10 poke balls and 5 potions^[w]" notify
+who @ "^[o^[gOh! And before you go, take this trainer set.  It includes one of each power item, an everstone, and a lucky egg.  You gotta find more though." notify
+who @ "^[o^[w[^[gRecieved a Power Anklet, a Power Band, a Power Belt, a Power Bracer, a Power Lens, a Power Weight, an Everstone, and a Lucky Egg^[w]" notify
 (who @ "^[o^[gYou feel inspired! ^[w[^[gYou now have 1000 tp^[w]" notify)
 ;
