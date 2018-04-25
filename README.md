@@ -5,7 +5,7 @@ Pokémon Fusion is a role-playing MUCK where your character leads a party of six
 
 What is a MUCK?
 ---------------
-MUCK (multi-user... CK) is one of the many derivatives of the telnet-based MUD (Multi-User Dungeon) system. Its a type of telnet server that allows users to connect to a character and role-play via text; have their characters pose, look, and do rudimentary actions. These servers includes a scripting language to further develop what a character do, including implementing a full role-playing game combat system with stats and experience points.
+MUCK (Multi User Character/Chat Kingdom) is one of the many derivatives of the telnet-based MUD (Multi-User Dungeon) system. Its a type of telnet server that allows users to connect to a character and role-play via text; have their characters pose, look, and do rudimentary actions. These servers includes a scripting language to further develop what a character do, including implementing a full role-playing game combat system with stats and experience points.
 
 What is this Repository for?
 ----------------------------
