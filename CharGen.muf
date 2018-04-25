@@ -148,7 +148,7 @@ begin
         pversion @ ".abort" smatch if "^[rAborted" tellme exit then
         pversion @ "1" smatch
         pversion @ "2" smatch or if 
-                                   { "^[o^[gYou've chosen Version " #0 { "@pokemon verisons/" pversion @ "/name" }cat getprop "." }cat tellme break then
+                                   { "^[o^[gYou've chosen Version " #0 { "@pokemon versions/" pversion @ "/name" }cat getprop "." }cat tellme break then
         "^[o^[y Please enter either 1 or 2." tellme
         
 repeat
@@ -691,6 +691,7 @@ me @ { "@achieve/poke-owned/" speciesnum @  }cat 1 setprop
  
  
 : main
+pop
 me @ "@valid?" propdir? if
   "You're already valid." tellme
   exit
