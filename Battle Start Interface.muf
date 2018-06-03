@@ -33,7 +33,7 @@ var temp
 var temp2
 var temp3
 var temp4
-
+ 
 var wascharging
  
 : notify_watchers
@@ -46,26 +46,26 @@ var! msg
          tempref @ { msg @ }cat notify
          repeat
 ;
-
+ 
 : moldbreaker (this is done after the ability smatch, if it has a 0 then skip this and return 0, if it has a 1 then do the check for the ability. return a 0 if broken and a 1 if not)
 var! BID
 var! targ
 var! sresult
-
+ 
 sresult @ not if 0 exit then
-
+ 
 targ @ "Ability" fget var! uabil
-
+ 
 uabil @ "mold breaker" smatch
 uabil @ "Turboblaze" smatch or
 uabil @ "Teravolt" smatch or if
-
+ 
    loc @ { "@battle/" BID @ "/temp/moldbreakermessage" }cat getprop not if
            loc @ { "@battle/" BID @ "/temp/moldbreakermessage" }cat 1 setprop
            uabil @ "mold breaker" smatch if
           { "^[o^[y" targ @ id_name " breaks the mold!" }cat bid @ notify_watchers
           then
-
+ 
              uabil @ "Turboblaze" smatch if
             { "^[o^[y" targ @ id_name " is radiating a blazing aura!" }cat bid @ notify_watchers
           then
@@ -144,12 +144,12 @@ repeat
  
  
 ;
-
+ 
 : verifycontrol (this is to help fix issues where the system bugs out due to an AI issue or something else)
-
-
+ 
+ 
 ;
-
+ 
  
 : divdamage (this is just used to change the division to decimals, round up, then make back into int)
 var! div
@@ -212,14 +212,14 @@ then
 then
  
 ;
-
+ 
 : levelupmoves
 (this shoulden't run anymore, decided to have the prompt behave differently and not pause combat.)
 var! BID
 var team
 var controller
 var lp
-
+ 
 (this is the code segment for checking if a pokemon has a move that needs to be learned and prompts accordingly.)
 { "A" "B" }list foreach team ! pop
         loc @ { "@battle/" BID @ "/teams/" team @ "/" }cat array_get_propvals foreach id ! pop
@@ -227,7 +227,7 @@ var lp
                         1 lp !
                         
                         loc @ { "@battle/" BID @ "/control/team" team @ "/" id @ }cat getprop controller !
-
+ 
                         controller @ dbref? if
                                 controller @ { "@learning pending/" id @  }cat getprop if continue then
                                 loc @ { "@battle/" BID @ "/levelmovepending/" ID @ }cat controller @ setprop
@@ -240,7 +240,7 @@ var lp
 repeat
 lp @ if
 (message if something has a learning pending)
-
+ 
 then
 ;
  
@@ -333,7 +333,7 @@ loc @ { "@battle/" bid @ "/howmany" }cat getprop atoi 2 = if
    continue then (uses continue so it doesn't do the AI segment)
  
 (this part here is where the AI does its switching)
-
+ 
 "AI" BID @ pos @ moveswitch
 BID @ pos @ "A*" smatch if "B" else "A" then endbattle
 (
@@ -342,7 +342,7 @@ BID @ pos @ "A*" smatch if "B" else "A" then endbattle
   break
   repeat
 Pos @ BID @ id @ switch_handler )
-
+ 
  
 repeat
  
@@ -688,9 +688,11 @@ $libdef abortbattle
 : abortbattle
 var bid
 var! aborter 
-(this eventully will only be used by admins to abort battles that need aborting, but for now its good for testing)
+(this eventully will only be used by admins to abort battles that need aborting, but for now it's good for testing)
 (me @ "@huntingteam/following" getprop if "^[o^[rFollowers can't abort." tellme exit then)
 me @ "@battle/battleid" getprop BID !
+BID @ if
+ 
 aborter @ "player" smatch if
 { "^[r^[oThe battle was aborted by ^[c" me @ name "^[r." }cat BID @ notify_watchers
 then
@@ -698,8 +700,10 @@ aborter @ "error" smatch if
 { "^[r^[oThe battle was aborted by ^[can error^[r." }cat BID @ notify_watchers
 then
 BID @ removebattle
+ 
+then
 loc @ { "@battle/" bid @ }cat remove_prop
-
+ 
 ; PUBLIC abortbattle
  
 : abortprecheck
@@ -789,12 +793,6 @@ user @ "Speed" Calculate temp !
         POKEDEX { "items/" user @ "holding" get "/halfspeed" }cat getprop if
         temp @ 2 / temp !
         then
-
-loc @ { "@battle/" BID @ "/pledge field/" pos @ 1 1 midstr "/move" }cat getprop if
-        loc @ { "@battle/" BID @ "/pledge field/" pos @ 1 1 midstr "/move" }cat getprop "grass pledge" smatch if
-                temp @ 2 / temp !
-        then
-then
  
 user @ "ability" fget "slow start" smatch if
         user @ "status/statmods/ability/slow start" get atoi 5 > not if
@@ -958,13 +956,13 @@ var posid
 loc @ { "@battle/" BID @ "/BattleReady" }Cat getprop if exit then
 (this bit is for gen 5, not finished)
 (loc @ { "@battle/" BID @ "/howmany" }cat getprop atoi temp !
-
+ 
 { "A" "B" }cat list foreach temp2 ! pop
 0 conid !
 1 temp @ 1 for temp3 !
-
+ 
 { temp2 @ temp3 @ }cat posid !
-
+ 
 repeat
 repeat
 )
@@ -1049,10 +1047,10 @@ pos @ 2 1 midstr var! tnum
  
 loc @ { "@battle/" bid @ "/position/" pos @ }cat getprop if
 loc @ { "@battle/" bid @ "/position/" pos @ }cat getprop curpoke !
-
+ 
 curpoke @ temp !
 curpoke @ bid @ team @ illusion curpoke !
-
+ 
 tempref @ { "^[o" tc @ tnum @ " ^[y"
 curpoke @ { "/pokemon/" curpoke @ "species" fget "/name" }cat fget dup not if pop "??????????" then 1 15 midstr 15 " " padr
 " "
@@ -1079,14 +1077,14 @@ then
 curpoke @ "gender" fget "N*" smatch curpoke @ "gender" fget "O*" smatch or if
 "^[o^[m" { curpoke @ "gender" fget 1 1 midstr }cat
 then
-
+ 
 " " tc @ "| ^[y"
 curpoke @ id_name 1 14 midstr 14 " " padr
 temp @ curpoke ! 
 " " tc @ "| ^[yLv "
 curpoke @ FindPokeLevel intostr 3 " " padr
 " " tc @ "| ^[y"
-
+ 
 loc @ { "@battle/" bid @ "/position/" pos @ }cat getprop curpoke !
 "^[wNRM"
     curpoke @ "status/frozen"    get if pop "^[cFRZ"    then
@@ -1173,7 +1171,7 @@ repeat
 "" tc @ "=====================^[yTeam" tc @ "=^[y" team @ tc @ "=================================" }cat notify
 then
 ;
-
+ 
  
 : combatdisplay  (this is the display)
 var! bid
@@ -1224,7 +1222,7 @@ tempref @ { "^[o^[m| ^[o^[yWeather: "
 { loc @ { "@battle/" bid @ "/turn" }cat getprop stringify 6 " " padr }cat
 " ^[o^[m|" }cat notify
 tempref @ { "^[o^[m-------------------------------------------------------------------------------" }cat notify
-
+ 
 loc @ { "@battle/" BID @ "/aitype" }cat getprop "wild" smatch not if
 tempref @ 
 { "^[o^[rB ^[y" loc @ { "@battle/" BID @ "/trainers/B" }cat getprop 1 75 midstr 75 " " padr " ^[rB" }cat
@@ -1517,7 +1515,7 @@ var pos
                         
  
                         then
-                        
+ 
                         else
  
                         { "^[o^[c" controller @ id_name "^[y used ^[c" item @ cap " ^[yon ^[c" tpos @ "." target @ id_name "^[c." }cat bid @ notify_watchers
@@ -1754,6 +1752,12 @@ var pos
            { "^[o^[c" pos @ "." target @ id_name "^[y is fully paralyzed!" }cat bid @ notify_watchers
            (paralized also removes repeat moves)
            loc @ { "@battle/" BID @ "/repeats/" pos @ }cat remove_prop
+		   (paralized should also remove any semi involnerable moves moves)
+		   target @ "status/statmods/semi-inv" get if
+			loc @ { "@battle/" BID @ "/charge/" pos @ "/charging" }cat remove_prop
+			loc @ { "@battle/" BID @ "/Declare/" pos @ }cat remove_prop
+			target @ { "status/statmods/semi-inv" }cat 0 setto
+		   then
           break
          then
          then
@@ -2020,7 +2024,7 @@ var pos
               "Thief"
               "Transform"
               "Trick"
-
+ 
               
               }list assist @ array_diff assist !
             (assist now stores a list array of legal moves known by the selected pokemon)
@@ -2402,6 +2406,16 @@ var pos
                move @ attacker @ attacker @ BID @ pos @ pos @ damage_calc then
  
                t-type @ "all" smatch if
+      
+    loc @ { "@battle/" bid @ "/howmany" }cat getprop atoi 2 = if
+    { "A1" "B1" "A2" "B2" }list pos_list !
+    else loc @ { "@battle/" bid @ "/howmany" }cat getprop atoi 3 = if
+      { "A1" "B1" "A2" "B2" "A3" "B3" }list pos_list !
+      else
+      { "A1" "B1" }list pos_list !
+      then
+    then
+      
                pos_list @ foreach tpos ! pop
                loc @ { "@battle/" BID @ "/position/" tpos @ }cat getprop target !
  
@@ -2414,7 +2428,7 @@ var pos
                loc @ { "@battle/" BID @ "/teams/" team @ "/" }cat array_get_propvals foreach attacker ! pop
                move @ attacker @ attacker @ BID @ pos @ pos @ damage_calc
                repeat
-
+ 
  
                then
  
@@ -2749,20 +2763,6 @@ target @ "ability" fget "klutz" smatch not target @ "status/statmods/embargo" ge
         then
 then
 (end damanging hold items)
-
-(fire pledge)
-loc @ { "@battle/" BID @ "/pledge field/" pos @ 1 1 midstr "/move" }cat getprop dup if "fire pledge" smatch else 0 then
-bid @ check_weather "rain dance" smatch and if
-        { "^[o^[yThe rain removed ^[cFire Pledge's^[y field from ^[cTeam " pos @ 1 1 midstr "'s ^[yside." }cat bid @ notify_watchers
-        loc @ { "@battle/" BID @ "/pledge field/" pos @ 1 1 midstr "/move" }cat remove_prop
-then
-
-loc @ { "@battle/" BID @ "/pledge field/" pos @ 1 1 midstr "/move" }cat getprop dup if "fire pledge" smatch else 0 then if
-        maxhp @ 8 target @ "pvp/hpboost" fget dup if atoi * else pop then divdamage damage !
-        target @ "status/hp" over over get atoi damage @ - setto
-        { "^[o^[c" pos @ "." target @ id_name "^[y took some damage from ^[cFire Pledge's^[y field." }cat bid @ notify_watchers
-then
-
  
 (do status removal abilities here)
 0 temp !
@@ -2782,7 +2782,7 @@ temp @ if
         then
  
 then
-
+ 
 target @ "ability" fget "healer" smatch if
         { { pos @ 1 1 midstr pos @ 2 1 midstr atoi 1 + }cat { pos @ 1 1 midstr pos @ 2 1 midstr atoi 1 - }cat }list foreach temp ! pop
                 loc @ { "@battle/" BID @ "/position/" temp @ }cat getprop temp2 !
@@ -3011,38 +3011,6 @@ target @ "status/statmods/semi-inv" get not if
  
 then
  (weather abilities end)
- (harvest ability)
- target @ "ability" fget "harvest" smatch if
-        target @ "holding" get "Nothing" smatch not if
-                loc @ { "@battle/" BID @ "/EatenBerry/" target @ }cat getprop if
-                        random 2 % if
-                                 "^[o^[c" pos @ "." target @ id_name "^[y harvested a new ^[c" loc @ { "@battle/" BID @ "/EatenBerry/" target @ }cat getprop cap "^[y with its ability ^[cHarvest^[y!" }cat bid @ notify_watchers
-                                 target @ "holding" loc @ { "@battle/" BID @ "/EatenBerry/" target @ }cat getprop setto
-                        then
-                then
-        then
- then
- 
- (moody ability)
- target @ "ability" fget "moody" smatch if
-        { "PhysAtk" "PhysDef" "SpecAtk" "SpecDef" "Speed" }list temp !
-        0 temp3 !
-                temp @ foreach swap pop temp2 !
-        target @ { "status/statmods/" temp2 @ }cat get atoi 6 >= if continue then
-                temp2 @ temp3 !
-                target @ { "status/statmods/" temp3 @ }cat over over get atoi 2 + setto
-                "^[o^[c" pos @ "." target @ id_name "^[y's ^[c" temp3 @ "^[y stat raised sharply due to its ability ^[cMoody^[y!" }cat bid @ notify_watchers
-                break
-        repeat
-        temp @ foreach swap pop temp2 !
-                target @ { "status/statmods/" temp2 @ }cat get atoi -6 <= if continue then
-                temp2 @ temp3 @ smatch if continue then
-                target @ { "status/statmods/" temp2 @ }cat over over get atoi 1 - setto
-                "^[o^[c" pos @ "." target @ id_name "^[y's ^[c" temp2 @ "^[y stat lowered due to its ability ^[cMoody^[y!" }cat bid @ notify_watchers
-                break
-        repeat
-        
- then
  
  target @ "status/statmods/block/move" get if
                 target @ "status/statmods/block/user" get loc @ { "@battle/" BID @ "/position/" target @ "status/statmods/block/userposition" get }cat getprop stringify smatch not if
@@ -3126,11 +3094,6 @@ repeat
                                 then
                         then
                 repeat
-                (fields)
-                loc @ { "@battle/" BID @ "/pledge field/" temp2 @ "/turns" }cat over over getprop 1 - setprop
-                loc @ { "@battle/" BID @ "/pledge field/" temp2 @ "/turns" }cat getprop not if
-                        { "^[o^[yThe ^[c" loc @ { "@battle/" BID @ "/pledge field/" temp2 @ "/move" }cat getprop  " field^[y has worn off for on ^[cTeam " team @ "^[y." }cat bid @ notify_watchers
-                then
         repeat
         (end shields)
         
@@ -3287,7 +3250,6 @@ then
         temp @ "status/statmods/embargo" over over get atoi 1 - setto
   then
  
- loc @ { "@battle/" BID @ "/temp/round_boost/" }cat remove_prop
  
   BID @ pos @ endbattle
  
@@ -3369,12 +3331,12 @@ loc @ { "@battle/" BID @ "/position/" }cat propdir? not if
 "error" abortbattle
 exit
 then
-
-
+ 
+ 
 loc @ { "@battle/" BID @ "/battling/" }cat array_get_propvals foreach pop stod temp !
 temp @ "@lastbattle" systime setprop  (leave this disabled unless you want a timeout for battles)
 repeat
-
+ 
 (set the room's weather)
 loc @ { "@weather/current" }cat getprop if
         loc @ { "@battle/" BID @ "/roomweather" }cat loc @ { "@weather/current" }cat getprop setprop
@@ -3409,7 +3371,7 @@ loc @ { "@battle/" BID @ "/recycle/" pos @ }cat target @ "holding" get setprop
 repeat
  
 ;
-
+ 
 : 4movesverifier
 (make sure the current moveset is valid, if not adjust)
 var! BID
@@ -3417,15 +3379,15 @@ var trueid
 var omove
 var slot
 var tmove
-
+ 
 var pos_list
 var pos
 { "A1" "B1" "A2" "B2" }list pos_list !
 pos_list @ foreach pos ! pop
-
+ 
 loc @ { "@battle/" BID @ "/position/" POS @ }cat getprop id !
 id @ not if continue then
-
+ 
         LOC @ { "@battle/" BID @ "/movesets/" ID @ }cat getprop var! moveset
        POKESTORE { "@pokemon/" id @ fid "/@temp/movesets/" }cat propdir? not if (make sure moves are current and replace if not)
         { "A" "B" "C" "D" }list foreach slot ! pop
@@ -3447,14 +3409,14 @@ id @ not if continue then
                                  LOC @ { "@battle/" BID @ "/movesets/" ID @ "/" slot @ }cat tmove @ setprop
                          then
                          
-
+ 
         repeat
         then
-
-
+ 
+ 
 repeat
-
-
+ 
+ 
 ;
  
 $libdef battlelooper
@@ -3466,7 +3428,7 @@ begin
 loc @ { "@battle/" BID @ }cat propdir? not if
 exit
 then
-
+ 
 ( Don't let this run 
 BID @ levelupmoves
 loc @ { "@battle/" BID @ "/levelmovepending/" }cat propdir? if
@@ -3480,9 +3442,9 @@ exit
 then
 loc @ { "@battle/" BID @ "/needtoswitch" }cat propdir? not if break then
 repeat
-
+ 
 loc @ { "@battle/" BID @ }cat propdir? not if exit then
-
+ 
 loc @ { "@battle/" BID @ "/tempvalues/displayed" }cat getprop not if
 loc @ { "@battle/" BID @ "/Begin Position/" }cat remove_prop
 loc @ { "@battle/" BID @ "/declare/switch/" }cat remove_prop
@@ -3502,17 +3464,16 @@ loc @ { "@battle/" BID @ "/specialbattle" }cat getprop if
         "^[o^[M^[r<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><"  bid @ notify_watchers
         loc @ { "@battle/" BID @ "/specialbattle" }cat remove_prop
 then
-
+ 
 BID @ combatdisplay
 loc @ { "@battle/" BID @ "/tempvalues/displayed" }cat 1 setprop
 then
  
 loc @ { "@battle/" BID @ "/firstturn" }cat getprop not if
 BID @ firstturn
-
 loc @ { "@battle/" BID @ "/firstturn" }cat "taken" setprop
 then
-
+ 
 loc @ { "@battle/" BID @ "/4moves" }cat getprop if
 BID @ 4movesverifier
 then
@@ -3693,17 +3654,17 @@ who @ { "items/" item @ "/UseEffect" }cat get ":" explode_array foreach effect !
 repeat
 useable @
 ;
-
+ 
 : 4movesdisplay
 var! move2letter
 var! move1letter
 var! BID
 var! who
-
+ 
 loc @ { "@battle/" BID @ "/movesets/" who @ }cat getprop var! moveset
 who @ { "movesets/" moveset @ "/" move1letter @ }cat fget cap var! move1 
 who @ { "movesets/" moveset @ "/" move2letter @ }cat fget cap var! move2 
-
+ 
 var m1element
 var m1class
 var m1ppmax
@@ -3716,7 +3677,7 @@ var m2ppmax
 var m2ppcur
 var m2power
 var m2accuracy
-
+ 
 var ppup
 move1 @ not if
 "None" move1 !
@@ -3727,7 +3688,7 @@ move1 @ not if
 "0" m1power !
 "0" m1accuracy !
 else
-
+ 
 POKEDEX { "/moves/" move1 @ "/Type" }cat     getprop m1element !
 POKEDEX { "/moves/" move1 @ "/Class" }cat    getprop m1class !
 POKEDEX { "/moves/" move1 @ "/power" }cat    getprop m1power !
@@ -3737,7 +3698,7 @@ POKEDEX { "/moves/" move1 @ "/pp" }cat getprop atoi 5 ppup @ + * 5 /
                                                     stringify m1ppmax !
 who @ { "/movesknown/" move1 @ "/pp"}cat    fget m1ppcur !
 then
-
+ 
 move2 @ not if
 "None" move2 !
 " " m2element !
@@ -3755,22 +3716,22 @@ who @ { "/movesknown/" move2 @ }cat fget atoi 1 - ppup !
 POKEDEX { "/moves/" move2 @ "/pp" }cat getprop atoi 5 ppup @ + * 5 /
                                                      stringify m2ppmax !
 who @ { "/movesknown/" move2 @ "/pp"}cat     fget m2ppcur !
-
+ 
 then
-
+ 
 { "^[o^[w/-----------------" move1letter @ "------------------\\ /-----------------" move2letter @ "------------------\\" }cat tellme
 { "^[o^[w|  ^[g" move1 @ 13 " " padr "                     ^[w| |  ^[g" move2 @ 13 " " padr "                     ^[w|" }cat tellme
 { "^[o^[w|  ^[g" m1element @ 14 " " padr "  " m1class @ 14 " " padr " ^[w   | |  ^[g" m2element @ 14 " " padr "  " m2class @ 14 " " padr "^[w    |" }cat tellme
 { "^[o^[w|  ^[gPP:  ^[w" m1ppcur @ 2 "0" padl "^[g/^[w" m1ppmax @ 2 "0" padl "                        | |  ^[gPP:  ^[w" m2ppcur @ 2 "0" padl "^[g/^[w" m2ppmax @ 2 "0" padl "                        |" }cat tellme
 { "^[o^[w|  ^[gPower: ^[w" m1power @ 3 " " padr "^[g      ^[gAccuracy: ^[w" m1accuracy @ 3 " " padr "     ^[w| |  ^[gPower: ^[w" m2power @ 3 " " padr "^[g      Accuracy: ^[w" m2accuracy @ 3 " " padr "     ^[w|" }cat tellme
 { "^[o^[w\\------------------------------------/ \\------------------------------------/" }cat tellme
-
+ 
 ;
  
 : attackhandler  (this is used for the input of attacks. its declare function)
-
+ 
 verifycontrol
-
+ 
 me @ "@battle/control" getprop not if
 "^[o^[rWe aren't waiting for you to command right now." tellme
 exit then
@@ -3796,9 +3757,9 @@ pos @ "B*" smatch if
 then
 var move
 loc @ { "@battle/" BID @ "/Position/" pos @ }cat getprop who !
-
+ 
 (make sure the current moveset is valid, if not adjust)
-
+ 
 var trueid
 var omove
 var slot
@@ -3826,13 +3787,13 @@ loc @ { "@battle/" BID @ "/4moves" }cat getprop if
                                  LOC @ { "@battle/" BID @ "/movesets/" ID @ "/" slot @ }cat tmove @ setprop
                          then
                          
-
+ 
         repeat
         then
 then 
-
-
-
+ 
+ 
+ 
  
         var totalmoves
         who @ "status/statmods/encore/move" get if
@@ -3868,9 +3829,9 @@ then
         
                 repeat }list 
         then then
-
+ 
                 totalmoves !
-
+ 
                 {  totalmoves @ foreach swap pop move !
                   who @ { "status/statmods/imprisoned/move/" move @ }cat get if continue then
                   who @ "status/statmods/disabled/move" get stringify move @ smatch if continue then
@@ -3884,7 +3845,7 @@ then
                   continue
                   then
                   then
-
+ 
                   who @ "status/statmods/taunted" get if
                         POKEDEX { "moves/" move @ "/power" }cat getprop atoi not if
                         continue
@@ -3894,16 +3855,16 @@ then
                 move @
                 repeat
                 }list var! validmoves
-
+ 
                 arg @ not if
                 loc @ { "@battle/" BID @ "/4moves" }cat getprop if
                  who @ bid @ "A" "B" 4movesdisplay
                  who @ bid @ "C" "D" 4movesdisplay
-
+ 
                 else
-
+ 
                 { "^[o^[g-- ^[cMove List ^[g" "" 65 "-" padr }cat tellme
-
+ 
                  0 var! count
                  0 var! token
                  validmoves @ foreach swap pop move !
@@ -3925,7 +3886,7 @@ then
                   count @ if " ^[g| " "" 16 " " padr count @ 1 + 4 % count ! then
                   count @ if " ^[g| " "" 16 " " padr count @ 1 + 4 % count ! then
                   count @ not token @ and if "  ^[g|" }cat tellme then
-
+ 
                   
                   { "^[o^[g" "" 78 "-" padr }cat tellme
         then 
@@ -3933,11 +3894,11 @@ then
         "^[o^[rPick an attack, use '.abort' to cancel:" "Battle" pretty tellme
         read arg !
         arg @ ".abort" smatch if "^[r^[oAborting" tellme exit then
-
+ 
 then
-
+ 
 arg @ strip arg !
-
+ 
 arg @ "A" smatch if who @ { "movesets/" moveset @ "/A" }cat fget arg ! then
 arg @ "B" smatch if who @ { "movesets/" moveset @ "/B" }cat fget arg ! then
 arg @ "C" smatch if who @ { "movesets/" moveset @ "/C" }cat fget arg ! then
@@ -3949,7 +3910,7 @@ arg @ "D" smatch if who @ { "movesets/" moveset @ "/D" }cat fget arg ! then
  BID @ battlelooper
 exit then
 )
-
+ 
 validmoves @ not if "struggle" arg ! then
  
 arg @ "struggle" smatch
@@ -3968,7 +3929,7 @@ POKEDEX { "moves/" arg @ }cat propdir? if
 then
 exit
 then
-
+ 
 validmoves @ arg @ array_findval array_count not 
 arg @ "struggle" smatch not and
 if
@@ -4014,7 +3975,7 @@ then
  who @ "status/statmods/choice item/move" get not and if
         who @ "status/statmods/choice item/move" arg @ setto
 then
-
+ 
 (DON'T FORGET TO CHECK THE TARGET AND SET IF NESSARY)
 var mimic
 arg @ "mimic" smatch if
@@ -4403,7 +4364,7 @@ loc @ { "@battle/" BID @ "/teams/" team @ "/" id @ }cat getprop id !
  notvalid @ 4 = if
  " ^[y<Egg>"
 then
-
+ 
 loc @ { "@Battle/" BID @ "/control/team" team @ "/" id @ }cat getprop othercont !
 othercont @ me @ = not if
 { "  ^[g<" othercont @ name ">" }cat
@@ -4698,11 +4659,11 @@ then
 notvalid @ 3 = if
 " ^[r<Fainted>"
 then
-
+ 
 notvalid @ 4 = if
 " ^[y<Egg>"
 then
-
+ 
 loc @ { "@Battle/" BID @ "/control/team" team @ "/" id @ }cat getprop othercont !
 othercont @ me @ = not if
 { "  ^[g<" othercont @ name ">" }cat
@@ -5035,7 +4996,7 @@ else
         "^[y^[oEXP Share is turned ^[gON^[y." tellme
 then
 ;
-
+ 
 : main
 idletimer
 strip arg !
