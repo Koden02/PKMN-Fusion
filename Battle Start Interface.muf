@@ -1754,6 +1754,12 @@ var pos
            { "^[o^[c" pos @ "." target @ id_name "^[y is fully paralyzed!" }cat bid @ notify_watchers
            (paralized also removes repeat moves)
            loc @ { "@battle/" BID @ "/repeats/" pos @ }cat remove_prop
+		   (paralized should also remove any semi involnerable moves moves)
+		   target @ "status/statmods/semi-inv" get if
+			loc @ { "@battle/" BID @ "/charge/" pos @ "/charging" }cat remove_prop
+			loc @ { "@battle/" BID @ "/Declare/" pos @ }cat remove_prop
+			target @ { "status/statmods/semi-inv" }cat 0 setto
+		   then
           break
          then
          then
